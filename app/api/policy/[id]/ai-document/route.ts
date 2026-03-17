@@ -17,6 +17,9 @@ export async function POST(
             }
         });
     } catch (error: any) {
-        return new ApiResponse(error.statusCode || 500, error.message, null, false);
+        return NextResponse.json(
+            new ApiResponse(error.statusCode || 500, error.message, null, false),
+            { status: error.statusCode || 500 }
+        );
     }
 }
