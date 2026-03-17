@@ -11,10 +11,13 @@ const generateHash = async (password: string) => {
 };
 
 const generateAccessToken = async (id: string, name: string, email: string, role: string) => {
-  const expiresIn = process.env.ACCESS_TOKEN_EXPIRES_IN;
-  return jwt.sign({ id, name, email, role }, process.env.MY_SECRET_KEY as string, {
-    expiresIn: expiresIn ?? "7d",
-  });
+  const secret = process.env.MY_SECRET_KEY;
+  if (!secret) {
+    throw new ApiError(500, "MY_SECRET_KEY is not configured");
+  }
+
+  const expiresIn = (process.env.ACCESS_TOKEN_EXPIRES_IN ?? "7d") as jwt.SignOptions["expiresIn"];
+  return jwt.sign({ id, name, email, role }, secret, { expiresIn });
 };
 
 const normalizeRole = (role: string) => String(role || "").trim().toUpperCase();

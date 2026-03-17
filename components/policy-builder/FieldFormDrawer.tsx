@@ -39,7 +39,7 @@ const fieldSchema = z.object({
   orderIndex: z.number(),
 });
 
-type FieldFormValues = z.infer<typeof fieldSchema>;
+type FieldFormValues = z.input<typeof fieldSchema>;
 
 interface Rule {
   type: string;

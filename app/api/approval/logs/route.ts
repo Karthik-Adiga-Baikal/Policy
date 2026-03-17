@@ -4,19 +4,23 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    const logs = await prisma.approvalLog.findMany({
+    const logs = await prisma.executionLog.findMany({
       orderBy: { createdAt: "desc" },
       include: {
-        policy: {
-          select: {
-            name: true,
-            version: true,
-          },
-        },
-        checker: {
-          select: {
-            name: true,
-            email: true,
+        approvalQueue: {
+          include: {
+            policyEngine: {
+              select: {
+                name: true,
+                version: true,
+              },
+            },
+            reviewer: {
+              select: {
+                name: true,
+                email: true,
+              },
+            },
           },
         },
       },
@@ -24,13 +28,13 @@ export async function GET() {
 
     const formattedLogs = logs.map((log) => ({
       id: log.id,
-      policyId: log.policyId,
-      policyName: log.policy.name,
-      policyVersion: log.policy.version,
-      decision: log.decision,
-      notes: log.notes,
-      checkerName: log.checker.name,
-      checkerEmail: log.checker.email,
+      policyId: log.approvalQueue.policyEngineId,
+      policyName: log.approvalQueue.policyEngine.name,
+      policyVersion: log.approvalQueue.policyEngine.version,
+      decision: log.status,
+      notes: `${log.ruleName} | input: ${log.inputValue} | threshold: ${log.thresholdUsed}`,
+      checkerName: log.approvalQueue.reviewer?.name || "Unknown",
+      checkerEmail: log.approvalQueue.reviewer?.email || null,
       createdAt: log.createdAt,
     }));
 

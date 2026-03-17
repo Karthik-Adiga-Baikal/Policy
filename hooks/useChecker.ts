@@ -5,9 +5,19 @@ import { unwrapApiData } from "@/lib/unwrapApiData";
 
 type ApprovalQueueItem = {
   id: string;
-  name: string;
-  version: string;
-  updatedAt: string | Date;
+  currentLevel: string;
+  notes?: string | null;
+  timeInQueue: string | Date;
+  policyEngineId: string;
+  policyEngine?: {
+    name?: string;
+    version?: string;
+    maker?: {
+      name?: string;
+      email?: string;
+      role?: string;
+    };
+  };
 };
 
 export const useApprovalQueue = () => {

@@ -1,7 +1,7 @@
 import { ApiResponse } from "@/utils/ApiResponce";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(req: NextResponse) {
+export async function GET(req: NextRequest) {
     const userData = req.headers.get('x-user-data');
 
     if (!userData) {

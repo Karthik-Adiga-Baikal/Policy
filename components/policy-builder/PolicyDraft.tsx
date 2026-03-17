@@ -10,7 +10,7 @@ interface DraftField {
   fieldValues?: string | number | null;
   documentNotes?: string | null;
   rules?: string | null;
-  displayMode?: "document" | "table";
+  displayMode?: "document" | "table" | null;
 }
 
 interface DraftSubSection {
@@ -20,14 +20,14 @@ interface DraftSubSection {
   fields?: DraftField[];
   subFields?: DraftField[];
   subfields?: DraftField[];
-  displayMode?: "document" | "table";
+  displayMode?: "document" | "table" | null;
 }
 
 interface DraftSection {
   id: string;
   name: string;
   documentNotes?: string | null;
-  displayMode?: "document" | "table";
+  displayMode?: "document" | "table" | null;
   subTabs?: DraftSubSection[];
   subtabs?: DraftSubSection[];
 }
