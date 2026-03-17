@@ -1,4 +1,13 @@
 {
-  "buildCommand": "prisma generate && npm run build",
-  "installCommand": "npm install && prisma generate"
+  "buildCommand": "npx prisma generate && npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "functions": {
+    "app/api/**/*.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "env": {
+    "NODE_ENV": "production"
+  }
 }
