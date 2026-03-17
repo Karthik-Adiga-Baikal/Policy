@@ -13,7 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Check, X, MessageCircle, Paperclip, Link as LinkIcon, Table2 } from "lucide-react";
-import PolicyDraft from "./PolicyDraft";
+import PolicyDraft, { type RenderMode } from "./PolicyDraft";
+import RenderModeSelector from "./RenderModeSelector";
 
 interface ChatCitation {
   type: "tab" | "subtab" | "field";
@@ -105,7 +106,7 @@ export default function PolicyChatPopup({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
-  const [viewMode, setViewMode] = useState<"document" | "table">("document");
+  const [viewMode, setViewMode] = useState<RenderMode>("document");
   const [aiRepresentationHints, setAiRepresentationHints] = useState<RepresentationHint | null>(null);
   const [isViewModeOverridden, setIsViewModeOverridden] = useState(false);
 
@@ -1502,36 +1503,14 @@ export default function PolicyChatPopup({
             <div className="flex flex-col w-1/2 overflow-y-auto border rounded-lg p-3 bg-slate-50">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h4 className="text-sm font-semibold">AI Generated Draft</h4>
-                <div className="flex items-center rounded-md border border-slate-300 bg-white p-0.5 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setViewMode("document");
-                      setIsViewModeOverridden(true);
-                    }}
-                    className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-semibold transition-colors ${
-                      viewMode === "document"
-                        ? "bg-slate-100 text-slate-800 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    Document
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setViewMode("table");
-                      setIsViewModeOverridden(true);
-                    }}
-                    className={`inline-flex items-center gap-1.5 rounded-sm px-2 py-1 text-[10px] font-semibold transition-colors ${
-                      viewMode === "table"
-                        ? "bg-slate-100 text-slate-800 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    Table
-                  </button>
-                </div>
+                <RenderModeSelector
+                  value={viewMode}
+                  onChange={(mode) => {
+                    setViewMode(mode);
+                    setIsViewModeOverridden(true);
+                  }}
+                  className="mt-2"
+                />
                 {aiRepresentationHints && (
                   <div className="ml-2 flex items-center gap-2">
                     <span className="rounded bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700">
@@ -1578,7 +1557,7 @@ export default function PolicyChatPopup({
                         <h5 className="text-xs font-semibold text-gray-800">Draft Preview</h5>
                         <Table2 size={14} className="text-gray-500" />
                       </div>
-                      <PolicyDraft data={displayDraft || currentPolicyDraft} className="p-3" viewMode={viewMode} />
+                      <PolicyDraft data={displayDraft || currentPolicyDraft} className="p-3" renderMode={viewMode} />
                     </div>
 
                     <div className="flex gap-2 mt-4">
@@ -1615,7 +1594,7 @@ export default function PolicyChatPopup({
                 <div className="space-y-3">
                   <div className="rounded-lg border bg-white p-3">
                     <p className="mb-2 text-xs font-semibold text-gray-700">Current Draft Preview</p>
-                    <PolicyDraft data={currentPolicyDraft} className="p-5" viewMode={viewMode} />
+                    <PolicyDraft data={currentPolicyDraft} className="p-5" renderMode={viewMode} />
                   </div>
                   <div className="text-xs text-gray-500">
                     Ask AI to add, update, or delete sections. The preview will switch to pending AI changes automatically.

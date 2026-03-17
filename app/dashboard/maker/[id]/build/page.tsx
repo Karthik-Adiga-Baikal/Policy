@@ -8,13 +8,14 @@ import { useTabs } from "@/hooks/useHierarchy";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
 import type { PolicyField, Tab } from "@/types";
-import { ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen, AlignLeft, Table2 } from "lucide-react";
+import { ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 import TabList from "@/components/policy-builder/TabList";
 import SubTabSection from "@/components/policy-builder/SubTabSection";
 import SimulationSheet from "@/components/simulation/SimulationSheet";
 import PolicyChatPopup from "@/components/policy-builder/PolicyChatPopup";
-import PolicyDraft from "@/components/policy-builder/PolicyDraft";
+import PolicyDraft, { type RenderMode } from "@/components/policy-builder/PolicyDraft";
+import RenderModeSelector from "@/components/policy-builder/RenderModeSelector";
 
 export default function BuildPolicyPage() {
   const params = useParams<{ id: string | string[] }>();
@@ -27,7 +28,7 @@ export default function BuildPolicyPage() {
   const [showFieldRail, setShowFieldRail] = useState(true);
   const [showHeaderDetails, setShowHeaderDetails] = useState(true);
   const [isDraftPanelOpen, setIsDraftPanelOpen] = useState(false);
-  const [draftViewMode, setDraftViewMode] = useState<"document" | "table">("document");
+  const [draftViewMode, setDraftViewMode] = useState<RenderMode>("document");
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -363,32 +364,7 @@ export default function BuildPolicyPage() {
           >
             <div className="h-full overflow-y-auto p-4">
               <div className="mb-3 flex items-center justify-end">
-                <div className="flex items-center rounded-md border border-slate-300 bg-white p-0.5 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setDraftViewMode("document")}
-                    className={`inline-flex items-center gap-1.5 rounded-sm px-3 py-1 text-xs font-semibold transition-colors ${
-                      draftViewMode === "document"
-                        ? "bg-slate-100 text-slate-800 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    <AlignLeft size={14} />
-                    Document
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDraftViewMode("table")}
-                    className={`inline-flex items-center gap-1.5 rounded-sm px-3 py-1 text-xs font-semibold transition-colors ${
-                      draftViewMode === "table"
-                        ? "bg-slate-100 text-slate-800 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    <Table2 size={14} />
-                    Table
-                  </button>
-                </div>
+                <RenderModeSelector value={draftViewMode} onChange={setDraftViewMode} />
               </div>
               <PolicyDraft
                 data={{
@@ -400,7 +376,7 @@ export default function BuildPolicyPage() {
                   startDate: policyMeta.startDate,
                   tabs,
                 }}
-                viewMode={draftViewMode}
+                renderMode={draftViewMode}
               />
             </div>
           </aside>

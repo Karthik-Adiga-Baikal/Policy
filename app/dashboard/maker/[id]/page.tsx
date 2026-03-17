@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/store";
 import { setPolicyJson } from "@/store/slices/policySlice";
-import { ArrowLeft, Save, History, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, FileText, X, AlignLeft, Table2 } from "lucide-react";
+import { ArrowLeft, Save, History, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, FileText, X } from "lucide-react";
 import TabList from "@/components/policy-builder/TabList";
 import SubTabSection from "@/components/policy-builder/SubTabSection";
 import { useQuery } from "@tanstack/react-query";
@@ -32,7 +32,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import FloatingChatBot from "@/components/policy-builder/FloatingChatBot";
-import PolicyDraft from "@/components/policy-builder/PolicyDraft";
+import PolicyDraft, { type RenderMode } from "@/components/policy-builder/PolicyDraft";
+import RenderModeSelector from "@/components/policy-builder/RenderModeSelector";
 import AnalysisButton from "@/components/policy-builder/AnalysisButton";
 
 export default function PolicyBuilderPage() {
@@ -47,7 +48,7 @@ export default function PolicyBuilderPage() {
   const [showPolicyUpdate, setShowPolicyUpdate] = useState(false);
   const [isPolicyInfoOpen, setIsPolicyInfoOpen] = useState(false);
   const [isDraftPanelOpen, setIsDraftPanelOpen] = useState(false);
-  const [draftViewMode, setDraftViewMode] = useState<"document" | "table">("document");
+  const [draftViewMode, setDraftViewMode] = useState<RenderMode>("document");
   const [policy, setPolicy] = useState<any>(null);
   const [checkers, setCheckers] = useState<any[]>([]);
   const [versionChangeEnabled, setVersionChangeEnabled] = useState(false);
@@ -411,32 +412,7 @@ export default function PolicyBuilderPage() {
                 <h3 className="text-sm font-semibold text-gray-900">Policy Document Draft</h3>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex items-center rounded-md border border-slate-300 bg-white p-0.5 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setDraftViewMode("document")}
-                    className={`inline-flex items-center gap-1.5 rounded-sm px-3 py-1 text-xs font-semibold transition-colors ${
-                      draftViewMode === "document"
-                        ? "bg-slate-100 text-slate-800 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    <AlignLeft size={14} />
-                    Document
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDraftViewMode("table")}
-                    className={`inline-flex items-center gap-1.5 rounded-sm px-3 py-1 text-xs font-semibold transition-colors ${
-                      draftViewMode === "table"
-                        ? "bg-slate-100 text-slate-800 shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    <Table2 size={14} />
-                    Table
-                  </button>
-                </div>
+                <RenderModeSelector value={draftViewMode} onChange={setDraftViewMode} />
                 <button
                   onClick={() => setIsDraftPanelOpen(false)}
                   className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
@@ -456,7 +432,7 @@ export default function PolicyBuilderPage() {
                   startDate: policy?.startDate || policy?.effectiveDate || policy?.createdAt,
                   tabs: tabs as Tab[],
                 }}
-                viewMode={draftViewMode}
+                renderMode={draftViewMode}
               />
             </div>
           </div>

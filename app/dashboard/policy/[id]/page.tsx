@@ -270,6 +270,7 @@ export default function PolicyDetailPage() {
             </div>
             <LivePolicyDraft
               policyId={policyId}
+              storageKey={`render-mode-${policyId}`}
               tabs={tabs}
               policyName={policy?.name}
               policyDescription={policy?.description}

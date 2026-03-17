@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Tab } from "@/types";
-import { ChevronDown, ChevronUp, FileText, Table2, AlignLeft } from "lucide-react";
-import PolicyDraft, { type PolicyDraftData } from "@/components/policy-builder/PolicyDraft";
+import { ChevronDown, ChevronUp, FileText } from "lucide-react";
+import PolicyDraft, { type PolicyDraftData, type RenderMode, VALID_RENDER_MODES } from "@/components/policy-builder/PolicyDraft";
+import RenderModeSelector from "@/components/policy-builder/RenderModeSelector";
 
 interface LivePolicyDraftProps {
   policyId: string;
@@ -14,6 +15,7 @@ interface LivePolicyDraftProps {
   policyVersion?: string | number;
   policyStatus?: string;
   policyStartDate?: string | Date | null;
+  storageKey?: string;
 }
 
 export default function LivePolicyDraft({
@@ -25,9 +27,23 @@ export default function LivePolicyDraft({
   policyVersion,
   policyStatus,
   policyStartDate,
+  storageKey,
 }: LivePolicyDraftProps) {
   const [isDraftOpen, setIsDraftOpen] = useState(true);
-  const [viewMode, setViewMode] = useState<"document" | "table">("document");
+  const [renderMode, setRenderMode] = useState<RenderMode>(() => {
+    if (typeof window === "undefined" || !storageKey) return "document";
+    const saved = localStorage.getItem(storageKey);
+    if (saved && VALID_RENDER_MODES.includes(saved as RenderMode)) {
+      return saved as RenderMode;
+    }
+    return "document";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && storageKey) {
+      localStorage.setItem(storageKey, renderMode);
+    }
+  }, [renderMode, storageKey]);
 
   const draftData = useMemo<PolicyDraftData>(
     () => ({
@@ -52,32 +68,7 @@ export default function LivePolicyDraft({
           </div>
           <div className="flex items-center gap-2">
             {isDraftOpen && (
-              <div className="flex items-center rounded-md border border-slate-300 bg-white p-0.5 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("document")}
-                  className={`inline-flex items-center gap-1.5 rounded-sm px-3 py-1 text-xs font-semibold transition-colors ${
-                    viewMode === "document"
-                      ? "bg-slate-100 text-slate-800 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  <AlignLeft size={14} />
-                  Document
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("table")}
-                  className={`inline-flex items-center gap-1.5 rounded-sm px-3 py-1 text-xs font-semibold transition-colors ${
-                    viewMode === "table"
-                      ? "bg-slate-100 text-slate-800 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  <Table2 size={14} />
-                  Table
-                </button>
-              </div>
+              <RenderModeSelector value={renderMode} onChange={setRenderMode} />
             )}
             <button
               type="button"
@@ -96,7 +87,7 @@ export default function LivePolicyDraft({
           Draft preview is closed. Click <span className="font-semibold">Open Draft</span> to view the policy.
         </div>
       ) : (
-        <PolicyDraft data={draftData} viewMode={viewMode} />
+        <PolicyDraft data={draftData} renderMode={renderMode} />
       )}
     </aside>
   );
