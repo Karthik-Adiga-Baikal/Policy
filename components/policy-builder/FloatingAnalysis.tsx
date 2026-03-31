@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, Shield, CheckCircle, X, Minimize2, BarChart3 } from "lucide-react";
 import api from "@/lib/api";
+import { buildBackendAiUrl } from "@/lib/backendAiUrl";
 
 interface FloatingAnalysisProps {
   policyData: any;
@@ -24,7 +25,7 @@ export default function FloatingAnalysis({ policyData, policyId }: FloatingAnaly
     setLoading(true);
     setActiveAnalysis(type);
     try {
-      const { data } = await api.post("http://localhost:8000/api/policy-analysis/analyze", {
+      const { data } = await api.post(buildBackendAiUrl("/api/policy-analysis/analyze"), {
         policy_json: policyData,
         analysis_type: type
       });

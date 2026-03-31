@@ -65,12 +65,10 @@ export default function LoginPage() {
         })
       );
 
-      toast.success("Login successful!", { id: loadingToast });
-
-      // Clear all toasts before navigation
-      setTimeout(() => {
-        toast.dismiss();
-      }, 1000);
+      toast.success("Login successful!", {
+        id: loadingToast,
+        duration: 2000,
+      });
 
       const normalizedRole = String(user.role || "").toUpperCase();
       if (normalizedRole === "CHECKER") {
@@ -81,7 +79,10 @@ export default function LoginPage() {
         router.push("/dashboard");
       }
     } catch (error: unknown) {
-      toast.error(getErrorMessage(error), { id: loadingToast });
+      toast.error(getErrorMessage(error), {
+        id: loadingToast,
+        duration: 4000,
+      });
     }
   };
 

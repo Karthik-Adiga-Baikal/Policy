@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { setActiveTabId, setStep } from "@/store/slices/policySlice";
 import { useTabs } from "@/hooks/useHierarchy";
 import api from "@/lib/api";
+import { buildBackendAiUrl } from "@/lib/backendAiUrl";
 import toast from "react-hot-toast";
 import type { PolicyField, Tab } from "@/types";
 import { ChevronDown, ChevronUp, PanelLeftClose, PanelLeftOpen } from "lucide-react";
@@ -14,7 +15,7 @@ import TabList from "@/components/policy-builder/TabList";
 import SubTabSection from "@/components/policy-builder/SubTabSection";
 import SimulationSheet from "@/components/simulation/SimulationSheet";
 import PolicyChatPopup from "@/components/policy-builder/PolicyChatPopup";
-import PolicyDraft, { type RenderMode } from "@/components/policy-builder/PolicyDraft";
+import PolicyDraft, { type RenderMode, type SectionRenderModes } from "@/components/policy-builder/PolicyDraft";
 import RenderModeSelector from "@/components/policy-builder/RenderModeSelector";
 
 export default function BuildPolicyPage() {
@@ -29,6 +30,7 @@ export default function BuildPolicyPage() {
   const [showHeaderDetails, setShowHeaderDetails] = useState(true);
   const [isDraftPanelOpen, setIsDraftPanelOpen] = useState(false);
   const [draftViewMode, setDraftViewMode] = useState<RenderMode>("document");
+  const [sectionModes, setSectionModes] = useState<SectionRenderModes>({});
   const [isAnalysisPanelOpen, setIsAnalysisPanelOpen] = useState(false);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -91,7 +93,7 @@ export default function BuildPolicyPage() {
     };
 
     const [{ data: marketData }, { data: structureData }, { data: consistencyData }] = await Promise.all([
-      api.post("http://localhost:8000/api/agents/market-intelligence", {
+      api.post(buildBackendAiUrl("/api/agents/market-intelligence"), {
         policy_type: policyMeta.product || "general",
         field: firstField.fieldName || "Policy Parameter",
         value: firstField.thresholdValue ?? firstField.fieldValues ?? "N/A",
@@ -101,11 +103,11 @@ export default function BuildPolicyPage() {
           total_tabs: currentTabs.length,
         },
       }),
-      api.post("http://localhost:8000/api/agents/structure-analysis", {
+      api.post(buildBackendAiUrl("/api/agents/structure-analysis"), {
         policy_type: policyMeta.product || "general",
         policy_data: policyData,
       }),
-      api.post("http://localhost:8000/api/agents/consistency-audit", {
+      api.post(buildBackendAiUrl("/api/agents/consistency-audit"), {
         policy_type: policyMeta.product || "general",
         policy_data: policyData,
       }),
@@ -285,9 +287,8 @@ export default function BuildPolicyPage() {
 
       <main className="flex flex-1 flex-col overflow-hidden">
         <div
-          className={`animate-fade-in-down overflow-x-auto border-b bg-white/90 px-6 transition-all duration-300 backdrop-blur ${
-            showHeaderDetails ? "max-h-24 py-3 opacity-100" : "max-h-0 border-b-0 py-0 opacity-0"
-          }`}
+          className={`animate-fade-in-down overflow-x-auto border-b bg-white/90 px-6 transition-all duration-300 backdrop-blur ${showHeaderDetails ? "max-h-24 py-3 opacity-100" : "max-h-0 border-b-0 py-0 opacity-0"
+            }`}
         >
           <div className="flex items-center gap-2">
             <h3 className="mr-4 text-xs font-bold uppercase tracking-wider text-gray-400">Categories:</h3>
@@ -341,9 +342,8 @@ export default function BuildPolicyPage() {
           )}
 
           <div
-            className={`flex-1 space-y-6 overflow-y-auto p-6 transition-all duration-300 ${
-              isDraftPanelOpen || isAnalysisPanelOpen ? "lg:pr-172" : ""
-            }`}
+            className={`flex-1 space-y-6 overflow-y-auto p-6 transition-all duration-300 ${isDraftPanelOpen || isAnalysisPanelOpen ? "lg:pr-172" : ""
+              }`}
           >
             <div className="mx-auto max-w-4xl animate-fade-in-up">
               {validActiveTabId ? (
@@ -358,9 +358,8 @@ export default function BuildPolicyPage() {
           </div>
 
           <aside
-            className={`absolute inset-y-0 right-0 z-20 w-full max-w-2xl border-l bg-white shadow-xl transition-transform duration-300 ${
-              isDraftPanelOpen ? "translate-x-0" : "translate-x-full"
-            }`}
+            className={`absolute inset-y-0 right-0 z-20 w-full max-w-2xl border-l bg-white shadow-xl transition-transform duration-300 ${isDraftPanelOpen ? "translate-x-0" : "translate-x-full"
+              }`}
           >
             <div className="h-full overflow-y-auto p-4">
               <div className="mb-3 flex items-center justify-end">
@@ -377,14 +376,15 @@ export default function BuildPolicyPage() {
                   tabs,
                 }}
                 renderMode={draftViewMode}
+                sectionModes={sectionModes}
+                onSectionModeChange={(tabId, mode) => setSectionModes(prev => ({ ...prev, [tabId]: mode }))}
               />
             </div>
           </aside>
 
           <aside
-            className={`absolute inset-y-0 right-0 z-20 w-full max-w-2xl border-l bg-white shadow-xl transition-transform duration-300 ${
-              isAnalysisPanelOpen ? "translate-x-0" : "translate-x-full"
-            }`}
+            className={`absolute inset-y-0 right-0 z-20 w-full max-w-2xl border-l bg-white shadow-xl transition-transform duration-300 ${isAnalysisPanelOpen ? "translate-x-0" : "translate-x-full"
+              }`}
           >
             <div className="flex h-full min-h-0 flex-col">
               <div className="border-b bg-white p-4">

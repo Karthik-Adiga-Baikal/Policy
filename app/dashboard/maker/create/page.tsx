@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import toast from "react-hot-toast";
@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCheckers } from "@/hooks/useCheckers";
 import PolicyDraft from "@/components/policy-builder/PolicyDraft";
-import { Eye, FilePlus2, LayoutTemplate, Paperclip, Sparkles, UploadCloud } from "lucide-react";
+import { buildBackendAiUrl } from "@/lib/backendAiUrl";
+import { Eye, FilePlus2, FolderUp, LayoutTemplate, Paperclip, Sparkles, UploadCloud } from "lucide-react";
 import {
   PREDEFINED_POLICY_TEMPLATES,
   buildDraftPreviewFromTemplate,
@@ -73,6 +74,13 @@ type PolicyCreateResponse = {
   id: string;
 };
 
+type ExistingPolicyOption = {
+  id: string;
+  name: string;
+  version: string;
+  product: string;
+};
+
 export default function CreatePolicyPage() {
   const router = useRouter();
   const { data: checkers = [] } = useCheckers();
@@ -91,6 +99,43 @@ export default function CreatePolicyPage() {
   const [extracting, setExtracting] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("blank");
   const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null);
+  const [workflowTrack, setWorkflowTrack] = useState<"build" | "extract_only">("build");
+  const [buildMode, setBuildMode] = useState<"new" | "existing_changes">("new");
+  const [existingPolicies, setExistingPolicies] = useState<ExistingPolicyOption[]>([]);
+  const [selectedBasePolicyId, setSelectedBasePolicyId] = useState<string>("");
+  const [changeMode, setChangeMode] = useState<"annexure" | "update">("annexure");
+  const [extractOnlyFile, setExtractOnlyFile] = useState<File | null>(null);
+  const [extractOnlyLoading, setExtractOnlyLoading] = useState(false);
+  const [extractOnlyResult, setExtractOnlyResult] = useState<any>(null);
+
+  useEffect(() => {
+    if (workflowTrack !== "build" || buildMode !== "existing_changes") return;
+
+    let active = true;
+    api
+      .get("/policy/getAll")
+      .then(({ data }) => {
+        if (!active) return;
+        const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        const normalized = list
+          .filter((item: any) => item?.id && item?.name)
+          .map((item: any) => ({
+            id: String(item.id),
+            name: String(item.name),
+            version: String(item.version || "v1.0"),
+            product: String(item.product || "GENERAL"),
+          }));
+        setExistingPolicies(normalized);
+      })
+      .catch(() => {
+        if (!active) return;
+        setExistingPolicies([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [workflowTrack, buildMode]);
 
   const humanizeRelation = (relation?: string) => {
     const raw = String(relation || "").trim();
@@ -411,7 +456,7 @@ export default function CreatePolicyPage() {
     form.append("async", "false");
 
     const { data } = await api.post(
-      "http://localhost:8000/api/extraction/upload-policy",
+      buildBackendAiUrl("/api/extraction/upload-policy"),
       form,
       { headers: { "Content-Type": "multipart/form-data" } }
     );
@@ -433,8 +478,93 @@ export default function CreatePolicyPage() {
     setExtracting(false);
   };
 
+  const extractToPineconeOnly = async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("llm_provider", "azure-foundry");
+    form.append("async", "false");
+
+    const { data } = await api.post(
+      buildBackendAiUrl("/api/extraction/upload-policy"),
+      form,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    return data;
+  };
+
+  const handleExistingPolicyChanges = async () => {
+    if (!selectedBasePolicyId) {
+      throw new Error("Select an existing policy to continue");
+    }
+
+    const selectedPolicy = existingPolicies.find((policy) => policy.id === selectedBasePolicyId);
+    const baseVersion = selectedPolicy?.version || "v1.0";
+
+    if (changeMode === "annexure") {
+      const annexureVersion = `${baseVersion}-annexure-${Date.now()}`;
+      await api.post("/policy/version", {
+        policyId: selectedBasePolicyId,
+        versionNumber: annexureVersion,
+        changeNote: "Annexure draft created from existing policy workflow",
+      });
+    }
+
+    if (attachedFile) {
+      await extractAndSeedPolicy(selectedBasePolicyId);
+      toast.success("Existing policy updated with extracted draft blocks and rules");
+    }
+
+    router.push(`/dashboard/maker/${selectedBasePolicyId}/build?mode=${changeMode}`);
+  };
+
+  const handleExtractOnly = async () => {
+    if (!extractOnlyFile) {
+      throw new Error("Please attach a policy document for extraction");
+    }
+
+    setExtractOnlyLoading(true);
+    const result = await extractToPineconeOnly(extractOnlyFile);
+    setExtractOnlyResult(result);
+    setExtractOnlyLoading(false);
+    toast.success("Document extracted and sent to Pinecone successfully");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (workflowTrack === "extract_only") {
+      const loadingToast = toast.loading("Extracting policy and storing in Pinecone...");
+      try {
+        await handleExtractOnly();
+        toast.success("Extraction pipeline completed", { id: loadingToast });
+      } catch (error: any) {
+        toast.error(String(error?.response?.data?.message || error?.message || "Extraction failed"), {
+          id: loadingToast,
+        });
+      } finally {
+        setExtractOnlyLoading(false);
+      }
+      return;
+    }
+
+    if (buildMode === "existing_changes") {
+      const loadingToast = toast.loading(
+        changeMode === "annexure"
+          ? "Creating annexure flow from existing policy..."
+          : "Opening existing policy change workflow..."
+      );
+
+      try {
+        await handleExistingPolicyChanges();
+        toast.success("Existing policy workflow is ready", { id: loadingToast });
+      } catch (error: any) {
+        toast.error(String(error?.response?.data?.message || error?.message || "Failed to start existing policy workflow"), {
+          id: loadingToast,
+        });
+      }
+      return;
+    }
 
     const loadingToast = toast.loading(attachedFile ? "Creating policy and importing file..." : "Creating policy...");
     try {
@@ -481,6 +611,135 @@ export default function CreatePolicyPage() {
 
   return (
     <div className="mx-auto max-w-7xl p-8">
+      <section className="mb-6 grid gap-4 md:grid-cols-2">
+        <button
+          type="button"
+          className="rounded-2xl border border-blue-600 bg-blue-50 p-5 text-left shadow-sm ring-2 ring-blue-100 transition-all"
+        >
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <FilePlus2 className="h-4 w-4 text-blue-600" />
+            Create New Policy
+          </div>
+          <p className="text-sm text-slate-600">
+            Start from blank, template, or upload a policy document to generate draft blocks and rules for a brand-new policy.
+          </p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard/maker/create/existing")}
+          className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:border-slate-300"
+        >
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <FolderUp className="h-4 w-4 text-blue-600" />
+            Upload Existing Policy
+          </div>
+          <p className="text-sm text-slate-600">
+            Open the existing-policy workflow page for changes/annexure flow or direct BRE rule generation from uploaded documents.
+          </p>
+        </button>
+      </section>
+
+      {workflowTrack === "extract_only" && (
+        <Card className="mb-8">
+          <CardContent className="pt-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Upload Existing Policy for Extraction</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                This path only runs extraction and Pinecone storage. It does not create a policy draft in Policy Manager.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Policy Document</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc,.txt,.md"
+                className="hidden"
+                onChange={(e) => setExtractOnlyFile(e.target.files?.[0] || null)}
+              />
+              <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs text-slate-600">
+                    {extractOnlyFile ? `Attached: ${extractOnlyFile.name}` : "Attach a policy file to extract and push into Pinecone"}
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <UploadCloud className="mr-2 h-4 w-4" />
+                    {extractOnlyFile ? "Change File" : "Attach File"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <Button type="button" className="w-full" onClick={handleExtractOnly} disabled={extractOnlyLoading}>
+              {extractOnlyLoading ? "Extracting and Uploading..." : "Extract Document and Upload to Pinecone"}
+            </Button>
+
+            {extractOnlyResult && (
+              <div className="rounded-lg border bg-slate-50 p-3 text-sm text-slate-700">
+                <p><span className="font-medium">Status:</span> {extractOnlyResult?.status || "completed"}</p>
+                <p><span className="font-medium">Policy Name:</span> {extractOnlyResult?.policy_name || extractOnlyResult?.result?.policy_name || "N/A"}</p>
+                <p><span className="font-medium">Pinecone Stored:</span> {String(extractOnlyResult?.pinecone_db?.stored ?? extractOnlyResult?.result?.pinecone_db?.stored ?? "unknown")}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {workflowTrack === "build" && buildMode === "existing_changes" && (
+        <Card className="mb-8">
+          <CardContent className="pt-6 space-y-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Existing Policy Change Workflow</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Select an existing policy, choose annexure or update flow, and optionally upload a document to extract new draft blocks/rules.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Base Policy</Label>
+              <Select value={selectedBasePolicyId} onValueChange={setSelectedBasePolicyId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select existing policy" />
+                </SelectTrigger>
+                <SelectContent>
+                  {existingPolicies.length === 0 ? (
+                    <SelectItem value="none" disabled>No policies available</SelectItem>
+                  ) : (
+                    existingPolicies.map((policy) => (
+                      <SelectItem key={policy.id} value={policy.id}>
+                        {policy.name} ({policy.version})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Change Type</Label>
+              <Select value={changeMode} onValueChange={(value: "annexure" | "update") => setChangeMode(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="annexure">Create Annexure Draft</SelectItem>
+                  <SelectItem value="update">Update Existing Draft</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Upload Supporting Policy Document (Optional)</Label>
+              <p className="text-xs text-slate-500">
+                If attached, extracted blocks and rules will be applied to the selected policy before opening build screen.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="mb-8 flex items-end justify-between gap-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Create New Policy</h1>
@@ -496,6 +755,7 @@ export default function CreatePolicyPage() {
         </div>
       </div>
 
+      {workflowTrack === "build" && buildMode === "new" && (
       <section className="mb-8">
         <div className="mb-4 flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-blue-600" />
@@ -597,38 +857,12 @@ export default function CreatePolicyPage() {
           })}
         </div>
       </section>
+      )}
 
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {selectedTemplate && (
-              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                <div className="font-semibold">Selected Template: {selectedTemplate.name}</div>
-                <div className="mt-1 text-blue-800">{selectedTemplate.description}</div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="name">Policy Name</Label>
-              <Input
-                id="name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder={attachedFile ? "Leave empty to use uploaded file name" : selectedTemplate ? `e.g. ${selectedTemplate.name} - North Region` : "Policy name"}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="product">Product</Label>
-              <Input
-                id="product"
-                type="text"
-                value={formData.product}
-                onChange={(e) => setFormData({ ...formData, product: e.target.value })}
-                placeholder={selectedTemplate ? selectedTemplate.product : "e.g., MSME, Personal Loan"}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Upload Existing Policy (Optional)</Label>
+            {workflowTrack === "build" && (
               <input
                 ref={fileInputRef}
                 type="file"
@@ -637,116 +871,210 @@ export default function CreatePolicyPage() {
                 onChange={(e) => {
                   const file = e.target.files?.[0] || null;
                   setAttachedFile(file);
-                  if (file) {
-                    setSelectedTemplateId("blank");
-                  }
-                  if (file && !formData.name.trim()) {
-                    setFormData((prev) => ({
-                      ...prev,
-                      name: file.name.replace(/\.[^.]+$/, ""),
-                    }));
+                  if (buildMode === "new") {
+                    if (file) {
+                      setSelectedTemplateId("blank");
+                    }
+                    if (file && !formData.name.trim()) {
+                      setFormData((prev) => ({
+                        ...prev,
+                        name: file.name.replace(/\.[^.]+$/, ""),
+                      }));
+                    }
                   }
                 }}
               />
-              <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs text-slate-600">
-                    {attachedFile
-                      ? `Attached: ${attachedFile.name}`
-                      : "Attach a policy file to auto-generate tabs, subtabs, and fields from extraction. Attaching a file will switch off template selection."}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {attachedFile && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAttachedFile(null)}
-                      >
-                        Remove
-                      </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      {attachedFile ? <Paperclip className="mr-2 h-4 w-4" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                      {attachedFile ? "Change File" : "Attach File"}
-                    </Button>
+            )}
+
+            {workflowTrack === "build" && buildMode === "new" && selectedTemplate && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                <div className="font-semibold">Selected Template: {selectedTemplate.name}</div>
+                <div className="mt-1 text-blue-800">{selectedTemplate.description}</div>
+              </div>
+            )}
+
+            {workflowTrack === "build" && buildMode === "new" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="name">Policy Name</Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder={
+                      attachedFile
+                        ? "Leave empty to use uploaded file name"
+                        : selectedTemplate
+                          ? `e.g. ${selectedTemplate.name} - North Region`
+                          : "Policy name"
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="product">Product</Label>
+                  <Input
+                    id="product"
+                    type="text"
+                    value={formData.product}
+                    onChange={(e) => setFormData({ ...formData, product: e.target.value })}
+                    placeholder={selectedTemplate ? selectedTemplate.product : "e.g., MSME, Personal Loan"}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Upload Existing Policy (Optional)</Label>
+                  <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs text-slate-600">
+                        {attachedFile
+                          ? `Attached: ${attachedFile.name}`
+                          : "Attach a policy file to auto-generate tabs, subtabs, and fields from extraction. Attaching a file will switch off template selection."}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {attachedFile && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAttachedFile(null)}
+                          >
+                            Remove
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          {attachedFile ? <Paperclip className="mr-2 h-4 w-4" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                          {attachedFile ? "Change File" : "Attach File"}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder={selectedTemplate?.description || "Describe the purpose of this policy"}
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                <SelectTrigger id="status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DRAFT">DRAFT</SelectItem>
-                  <SelectItem value="IN_REVIEW">IN_REVIEW</SelectItem>
-                  <SelectItem value="PUBLISHED">PUBLISHED</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="version">Version</Label>
-              <Input
-                id="version"
-                type="text"
-                required
-                value={formData.version}
-                onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                placeholder="v1.0"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="checker">Assign Checker (Optional)</Label>
-              <Select value={formData.checkerId} onValueChange={(value) => setFormData({ ...formData, checkerId: value })}>
-                <SelectTrigger id="checker">
-                  <SelectValue placeholder="Select checker" />
-                </SelectTrigger>
-                <SelectContent>
-                  {!Array.isArray(checkers) || checkers.length === 0 ? (
-                    <SelectItem value="none" disabled>No checkers available</SelectItem>
-                  ) : (
-                    checkers.map((checker) => (
-                      <SelectItem key={checker.id} value={checker.id}>
-                        {checker.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button type="submit" className="w-full" disabled={extracting}>
-              {extracting
-                ? "Analyzing File and Creating Policy..."
-                : attachedFile
-                  ? "Create Policy from Uploaded File"
-                  : selectedTemplate
-                    ? `Create Policy from ${selectedTemplate.name}`
-                    : "Create Policy"}
-            </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder={selectedTemplate?.description || "Describe the purpose of this policy"}
+                    rows={3}
+                  />
+                </div>
+              </>
+            )}
+
+            {workflowTrack === "build" && buildMode === "existing_changes" && (
+              <>
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                  <div className="font-semibold">Existing Policy Change Flow</div>
+                  <div className="mt-1 text-blue-800">
+                    {changeMode === "annexure"
+                      ? "A new annexure version snapshot will be created before opening the build workspace."
+                      : "Selected policy will open directly in update mode for draft changes."}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Attach Extraction File (Optional)</Label>
+                  <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-xs text-slate-600">
+                        {attachedFile
+                          ? `Attached: ${attachedFile.name}`
+                          : "Attach a file to extract new rules and append blocks to selected policy"}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {attachedFile && (
+                          <Button type="button" variant="outline" size="sm" onClick={() => setAttachedFile(null)}>
+                            Remove
+                          </Button>
+                        )}
+                        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                          <UploadCloud className="mr-2 h-4 w-4" />
+                          {attachedFile ? "Change File" : "Attach File"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {workflowTrack === "build" && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                    <SelectTrigger id="status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="DRAFT">DRAFT</SelectItem>
+                      <SelectItem value="IN_REVIEW">IN_REVIEW</SelectItem>
+                      <SelectItem value="PUBLISHED">PUBLISHED</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {buildMode === "new" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="version">Version</Label>
+                    <Input
+                      id="version"
+                      type="text"
+                      required
+                      value={formData.version}
+                      onChange={(e) => setFormData({ ...formData, version: e.target.value })}
+                      placeholder="v1.0"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="checker">Assign Checker (Optional)</Label>
+                  <Select value={formData.checkerId} onValueChange={(value) => setFormData({ ...formData, checkerId: value })}>
+                    <SelectTrigger id="checker">
+                      <SelectValue placeholder="Select checker" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {!Array.isArray(checkers) || checkers.length === 0 ? (
+                        <SelectItem value="none" disabled>No checkers available</SelectItem>
+                      ) : (
+                        checkers.map((checker) => (
+                          <SelectItem key={checker.id} value={checker.id}>
+                            {checker.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={extracting}>
+                  {extracting
+                    ? "Processing..."
+                    : buildMode === "existing_changes"
+                      ? changeMode === "annexure"
+                        ? "Create Annexure / Change Draft"
+                        : "Open Existing Policy for Changes"
+                      : attachedFile
+                        ? "Create New Policy from Uploaded File"
+                        : selectedTemplate
+                          ? `Create New Policy from ${selectedTemplate.name}`
+                          : "Create New Policy"}
+                </Button>
+              </>
+            )}
           </form>
         </CardContent>
       </Card>
 
       <Dialog open={!!previewTemplate} onOpenChange={(open) => !open && setPreviewTemplateId(null)}>
-        <DialogContent className="max-h-[90vh] w-[92vw] sm:max-w-300! overflow-hidden">
+        <DialogContent className="max-h-[90vh] w-[92vw] overflow-hidden sm:max-w-300!">
           {previewTemplate && (
             <>
               <DialogHeader>
@@ -762,10 +1090,7 @@ export default function CreatePolicyPage() {
                     <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product</div>
                     <div className="mt-1 font-medium text-slate-900">{previewTemplate.product}</div>
                   </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</div>
-                    <div className="mt-1 text-sm text-slate-700">{previewTemplate.description}</div>
-                  </div>
+                  <p className="text-sm text-slate-600">{previewTemplate.summary}</p>
                   <div className="grid grid-cols-3 gap-2 text-center text-xs">
                     {(() => {
                       const stats = getPolicyTemplateStats(previewTemplate);

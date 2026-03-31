@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Edit, Trash2, Plus, History } from "lucide-react";
 import Link from "next/link";
-import GenerateAIDoc from "@/components/policy-builder/GenerateAIDoc";
 import DownloadPolicyDoc from "@/components/policy-builder/DownloadPolicyDoc";
 import PolicyQueryEngine from "@/components/policy-builder/PolicyQueryEngine";
 import LivePolicyDraft from "@/components/policy-builder/LivePolicyDraft";
@@ -150,7 +149,6 @@ export default function PolicyDetailPage() {
             Back to Policies
           </Button>
           <div className="flex gap-3">
-            <GenerateAIDoc policyId={policy.id} policyName={policy.name} />
             <Button variant="outline" asChild>
               <Link href={`/dashboard/policy/${params?.id}/versions`}>
                 <History size={16} className="mr-2" />

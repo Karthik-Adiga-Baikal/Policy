@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2, TrendingUp, Shield, CheckCircle, BarChart3 } from "lucide-react";
 import api from "@/lib/api";
+import { buildBackendAiUrl } from "@/lib/backendAiUrl";
 
 interface AnalysisButtonProps {
   policyData: any;
@@ -21,7 +22,7 @@ export default function AnalysisButton({ policyData, policyId }: AnalysisButtonP
     setLoading(true);
     setIsOpen(true);
     try {
-      const { data } = await api.post("http://localhost:8000/api/policy-analysis/analyze", {
+      const { data } = await api.post(buildBackendAiUrl("/api/policy-analysis/analyze"), {
         policy_json: policyData,
         analysis_type: "full"
       });

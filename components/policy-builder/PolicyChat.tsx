@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Check, X } from 'lucide-react';
 import api from '@/lib/api';
+import { buildBackendAiUrl } from '@/lib/backendAiUrl';
 
 interface ChatMessage {
   role: 'user' | 'ai';
@@ -137,7 +138,7 @@ export default function PolicyChat({ currentPolicy, onPolicyUpdate, policyId }: 
     setLoading(true);
 
     try {
-      const { data } = await api.post('http://localhost:8000/api/chat/policy-builder', {
+      const { data } = await api.post(buildBackendAiUrl('/api/chat/policy-builder'), {
         message: input,
         current_policy: currentPolicy
       });

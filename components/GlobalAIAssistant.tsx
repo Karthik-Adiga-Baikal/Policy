@@ -24,7 +24,7 @@ export default function GlobalAIAssistant() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 left-6 z-50 w-14 h-14 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-linear-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group"
         title="AI Assistant"
       >
         <MessageCircle size={24} className="group-hover:scale-110 transition-transform" />
@@ -33,8 +33,8 @@ export default function GlobalAIAssistant() {
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setIsOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-[450px] h-[600px] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-2xl w-112.5 h-150 flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-linear-to-r from-blue-500 to-purple-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                   <Bot size={20} />

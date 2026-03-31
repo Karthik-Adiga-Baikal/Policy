@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, Shield, CheckCircle } from "lucide-react";
 import api from "@/lib/api";
+import { buildBackendAiUrl } from "@/lib/backendAiUrl";
 
 interface PolicyAnalysisProps {
   policyData: any;
@@ -21,7 +22,7 @@ export default function PolicyAnalysis({ policyData, policyId }: PolicyAnalysisP
     setLoading(true);
     setActiveAnalysis(type);
     try {
-      const { data } = await api.post("http://localhost:8000/api/policy-analysis/analyze", {
+      const { data } = await api.post(buildBackendAiUrl("/api/policy-analysis/analyze"), {
         policy_json: policyData,
         analysis_type: type
       });

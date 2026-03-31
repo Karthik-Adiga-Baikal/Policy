@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/navigation-menu";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export default function Navbar({ user }: { user: AuthUser | null }) {
   const dispatch = useAppDispatch();
@@ -35,6 +36,7 @@ export default function Navbar({ user }: { user: AuthUser | null }) {
   return (
     <header className="h-16 bg-white border-b px-8 flex items-center justify-between shadow-sm">
       <div className="flex items-center gap-8">
+        <SidebarTrigger className="-ml-3" />
         <h1 className="text-xl font-bold text-blue-600">Policy Management</h1>
         <NavigationMenu>
           <NavigationMenuList>

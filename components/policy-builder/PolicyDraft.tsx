@@ -67,10 +67,14 @@ export interface PolicyDraftData {
   tabs?: DraftSection[];
 }
 
+export type SectionRenderModes = Record<string, RenderMode>;
+
 interface PolicyDraftProps {
   data: PolicyDraftData;
   className?: string;
   renderMode?: RenderMode;
+  sectionModes?: SectionRenderModes;
+  onSectionModeChange?: (tabId: string, mode: RenderMode) => void;
   editable?: boolean;
   onChangeData?: (updated: PolicyDraftData) => void;
   fitContainer?: boolean;
@@ -91,6 +95,12 @@ function formatValue(field: DraftField): string {
   const value = field.thresholdValue ?? field.fieldValues;
   if (value === null || value === undefined || String(value).trim() === "") return "N/A";
   return String(value);
+}
+
+function getFullDisplayValue(field: DraftField): string {
+  const value = field.fieldValues ?? field.thresholdValue;
+  if (value === null || value === undefined || String(value).trim() === "") return "N/A";
+  return String(value).trim();
 }
 
 function getNarrativeContent(field: DraftField): string {
@@ -168,6 +178,10 @@ function getRules(subSection: DraftSubSection): DraftField[] {
   return subSection.fields || subSection.subFields || subSection.subfields || [];
 }
 
+const OFFICIAL_BODY_CLASS = "text-sm leading-8 text-slate-800";
+const OFFICIAL_NOTE_CLASS = "text-sm italic leading-8 text-slate-600";
+const OFFICIAL_RULE_TITLE_CLASS = "text-base font-semibold text-slate-900";
+
 function joinClassNames(...parts: Array<string | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
@@ -188,7 +202,7 @@ function normalizeDraft(data: PolicyDraftData): PolicyDraftData {
     subTabs: getSubSections(tab).map((subTab, subIndex) => ({
       ...subTab,
       id: subTab.id || makeId(`subtab-${tabIndex}-${subIndex}`),
-      displayMode: subTab.displayMode || "document",
+      displayMode: subTab.displayMode || "table",
       fields: getRules(subTab).map((field, fieldIndex) => ({
         ...field,
         id: field.id || makeId(`field-${tabIndex}-${subIndex}-${fieldIndex}`),
@@ -310,10 +324,145 @@ function JsonSpecBlock({ subSection }: { subSection: DraftSubSection }) {
   );
 }
 
+function SectionModeBar({
+  currentMode,
+  onChange,
+}: {
+  currentMode: RenderMode;
+  onChange: (mode: RenderMode) => void;
+}) {
+  const ICONS: Record<RenderMode, React.ReactNode> = {
+    document: (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="2" width="18" height="2.5" rx="1.25"/>
+        <rect x="0" y="8" width="13" height="2.5" rx="1.25"/>
+        <rect x="0" y="14" width="15" height="2.5" rx="1.25"/>
+      </svg>
+    ),
+    table: (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="0" width="8" height="5" rx="1.5"/>
+        <rect x="10" y="0" width="8" height="5" rx="1.5"/>
+        <rect x="0" y="7" width="8" height="5" rx="1.5"/>
+        <rect x="10" y="7" width="8" height="5" rx="1.5"/>
+        <rect x="0" y="14" width="8" height="4" rx="1.5"/>
+        <rect x="10" y="14" width="8" height="4" rx="1.5"/>
+      </svg>
+    ),
+    scorecard: (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="1" width="11" height="2.5" rx="1.25"/>
+        <circle cx="16" cy="2.25" r="2"/>
+        <rect x="0" y="8" width="11" height="2.5" rx="1.25"/>
+        <circle cx="16" cy="9.25" r="2"/>
+        <rect x="0" y="15" width="11" height="2.5" rx="1.25"/>
+        <circle cx="16" cy="16.25" r="2"/>
+      </svg>
+    ),
+    "rule-matrix": (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="0" width="7" height="18" rx="1" opacity="0.25"/>
+        <rect x="11" y="0" width="7" height="18" rx="1" opacity="0.25"/>
+        <rect x="8" y="0" width="2" height="18" rx="1"/>
+      </svg>
+    ),
+    "two-column": (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="0" width="6" height="18" rx="1" opacity="0.5"/>
+        <rect x="8" y="0" width="10" height="18" rx="1" opacity="0.25"/>
+      </svg>
+    ),
+    "legal-outline": (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="1" width="16" height="2.5" rx="1.25"/>
+        <rect x="3" y="6" width="13" height="2" rx="1"/>
+        <rect x="6" y="11" width="10" height="2" rx="1"/>
+        <rect x="3" y="15.5" width="13" height="2" rx="1"/>
+      </svg>
+    ),
+    memo: (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="0" width="18" height="4" rx="1.5"/>
+        <rect x="0" y="5" width="18" height="1" rx="0.5" opacity="0.4"/>
+        <rect x="0" y="8" width="18" height="2" rx="1" opacity="0.3"/>
+        <rect x="0" y="12" width="14" height="2" rx="1" opacity="0.3"/>
+      </svg>
+    ),
+    checklist: (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="0" width="4" height="4" rx="1"/>
+        <rect x="6" y="1" width="12" height="2" rx="1" opacity="0.5"/>
+        <rect x="0" y="7" width="4" height="4" rx="1"/>
+        <rect x="6" y="8" width="10" height="2" rx="1" opacity="0.5"/>
+        <rect x="0" y="14" width="4" height="4" rx="1"/>
+        <rect x="6" y="15" width="11" height="2" rx="1" opacity="0.5"/>
+      </svg>
+    ),
+    "json-spec": (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <text x="1" y="15" fontSize="15" fontFamily="monospace">{`{}`}</text>
+      </svg>
+    ),
+    "card-grid": (
+      <svg width="14" height="14" viewBox="0 0 18 18" fill="currentColor">
+        <rect x="0" y="0" width="8" height="8" rx="2"/>
+        <rect x="10" y="0" width="8" height="8" rx="2"/>
+        <rect x="0" y="10" width="8" height="8" rx="2"/>
+        <rect x="10" y="10" width="8" height="8" rx="2"/>
+      </svg>
+    ),
+  };
+
+  const LABELS: Record<RenderMode, string> = {
+    document: "Prose",
+    table: "Table",
+    scorecard: "Scorecard",
+    "rule-matrix": "Rule Matrix",
+    "two-column": "Two Column",
+    "legal-outline": "Outline",
+    memo: "Memo",
+    checklist: "Checklist",
+    "json-spec": "JSON",
+    "card-grid": "Cards",
+  };
+
+  return (
+    <div className="flex items-center gap-2 my-3 px-1">
+      <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap flex-shrink-0">
+        Section view:
+      </span>
+      <div
+        className="flex items-center gap-1 overflow-x-auto"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {VALID_RENDER_MODES.map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            title={LABELS[mode]}
+            onClick={() => onChange(mode)}
+            className={`
+              flex-shrink-0 rounded-md p-1.5 transition-all duration-100
+              ${currentMode === mode
+                ? "bg-slate-800 text-white shadow-sm"
+                : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              }
+            `}
+          >
+            {ICONS[mode]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function PolicyDraft({
   data,
   className,
-  renderMode = "document",
+  renderMode = "table",
+  sectionModes,
+  onSectionModeChange,
   onChangeData,
   fitContainer = false,
 }: PolicyDraftProps) {
@@ -355,14 +504,12 @@ export default function PolicyDraft({
             const policyRequirement = operatorToPolicyRequirement(rule.operator, value);
             return (
               <div key={rule.id || `${sectionIndex}-${subIndex}-document-${idx}`} className="py-1 text-sm">
-                <p>
-                  <span className="font-semibold">{rule.fieldName || "Criteria"}</span>
-                  <span className="mx-2 text-slate-400">-</span>
-                  <span>{policyRequirement}</span>
-                </p>
+                <p className={OFFICIAL_RULE_TITLE_CLASS}>{rule.fieldName || "Criteria"}</p>
                 {rule.documentNotes ? (
-                  <p className="mt-1 text-sm italic text-slate-600">{rule.documentNotes}</p>
-                ) : null}
+                  <p className={`mt-1 ${OFFICIAL_BODY_CLASS}`}>{rule.documentNotes}</p>
+                ) : (
+                  <p className={`mt-1 ${OFFICIAL_NOTE_CLASS}`}>Requirement: {policyRequirement}</p>
+                )}
               </div>
             );
           })}
@@ -383,13 +530,19 @@ export default function PolicyDraft({
             </thead>
             <tbody>
               {rules.map((rule, idx) => {
-                const value = formatValue(rule);
+                const value = getFullDisplayValue(rule);
                 const requirement = operatorToPolicyRequirement(rule.operator, value);
                 return (
                   <tr key={rule.id || `${sectionIndex}-${subIndex}-table-${idx}`} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
-                    <td className="border-r border-b border-slate-200 px-4 py-3 align-top font-medium text-slate-900">{rule.fieldName || "Unnamed Field"}</td>
-                    <td className="border-r border-b border-slate-200 px-4 py-3 align-top text-slate-800">{requirement || "-"}</td>
-                    <td className="border-b border-slate-200 px-4 py-3 align-top italic leading-relaxed text-slate-600">{rule.documentNotes || "-"}</td>
+                    <td className="border-r border-b border-slate-200 px-4 py-3 align-top break-words">
+                      <p className={OFFICIAL_RULE_TITLE_CLASS}>{rule.fieldName || "Unnamed Field"}</p>
+                    </td>
+                    <td className="border-r border-b border-slate-200 px-4 py-3 align-top break-words">
+                      <p className={OFFICIAL_BODY_CLASS}>{requirement || "-"}</p>
+                    </td>
+                    <td className="border-b border-slate-200 px-4 py-3 align-top break-words">
+                      <p className={OFFICIAL_NOTE_CLASS}>{rule.documentNotes || getNarrativeContent(rule) || "-"}</p>
+                    </td>
                   </tr>
                 );
               })}
@@ -405,15 +558,17 @@ export default function PolicyDraft({
           <p className="mb-2 text-xs uppercase tracking-wider text-gray-500">{subSection.name || "Sub-section"}</p>
           <div className="border-l-2 border-slate-200 pl-3">
             {rules.map((rule, idx) => {
-              const rawValue = formatValue(rule);
+              const rawValue = getFullDisplayValue(rule);
               const hasValue = rawValue !== "N/A";
               return (
                 <div key={rule.id || `${sectionIndex}-${subIndex}-score-${idx}`} className="flex items-center gap-2 border-b border-slate-200 py-2">
-                  <span className="text-sm font-medium text-slate-700">{rule.fieldName || "Unnamed"}</span>
+                  <span className={OFFICIAL_RULE_TITLE_CLASS}>{rule.fieldName || "Unnamed"}</span>
                   <span className="flex-1 border-b border-dotted border-slate-300" />
                   <span className="text-[10px] text-gray-500">{rule.operator || "="}</span>
                   {hasValue ? (
-                    <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700">{rawValue}</span>
+                    <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-700 whitespace-pre-wrap break-words max-w-[60%]">
+                      {rawValue}
+                    </span>
                   ) : (
                     <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-400">Not set</span>
                   )}
@@ -437,18 +592,20 @@ export default function PolicyDraft({
             </thead>
             <tbody>
               {rules.map((rule, idx) => {
-                const value = formatValue(rule);
+                const value = getFullDisplayValue(rule);
                 return (
                   <tr key={rule.id || `${sectionIndex}-${subIndex}-matrix-${idx}`} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
                     <td className="border-b border-slate-200 px-4 py-3 align-top">
-                      <div className="font-semibold">{rule.fieldName || "Unnamed Field"}</div>
+                      <div className={OFFICIAL_RULE_TITLE_CLASS}>{rule.fieldName || "Unnamed Field"}</div>
                       <div className="mt-1 flex items-center gap-2">
                         <span className={`rounded px-2 py-0.5 text-[11px] ${getOperatorToneClass(rule.operator)}`}>{rule.operator || "="}</span>
-                        <span className="font-mono text-xs text-slate-700">{value}</span>
+                        <span className="font-mono text-xs text-slate-700 whitespace-pre-wrap break-words">{value}</span>
                       </div>
                     </td>
-                    <td className="border-b border-slate-200 px-4 py-3 align-top text-sm text-slate-700">
-                      {rule.documentNotes || rule.rules || <span className="italic text-gray-500">APPROVE / REJECT / ESCALATE</span>}
+                    <td className="border-b border-slate-200 px-4 py-3 align-top break-words">
+                      <p className={OFFICIAL_BODY_CLASS}>
+                      {getNarrativeContent(rule) || rule.rules || <span className="italic text-gray-500">APPROVE / REJECT / ESCALATE</span>}
+                      </p>
                     </td>
                   </tr>
                 );
@@ -466,18 +623,18 @@ export default function PolicyDraft({
             <p className="mb-4 rounded bg-slate-50 p-3 text-sm text-slate-700">{subSection.documentNotes}</p>
           ) : null}
           {rules.map((rule, idx) => {
-            const value = formatValue(rule);
+            const value = getFullDisplayValue(rule);
             const requirement = operatorToPolicyRequirement(rule.operator, value);
             return (
               <div key={rule.id || `${sectionIndex}-${subIndex}-col-${idx}`} className="mb-3 border-b border-slate-100 pb-3">
                 <div className="flex gap-3">
                   <div className="w-2/5 border-l-4 border-slate-200 pl-4">
-                    <p className="text-sm font-semibold text-slate-700">{rule.fieldName || "Criteria"}</p>
-                    <p className="text-xs text-gray-500">{requirement}</p>
+                    <p className={OFFICIAL_RULE_TITLE_CLASS}>{rule.fieldName || "Criteria"}</p>
+                    <p className={OFFICIAL_NOTE_CLASS}>{requirement}</p>
                   </div>
                   <div className="w-3/5">
-                    <p className="font-medium text-slate-900">{value}</p>
-                    {rule.documentNotes ? <p className="mt-1 text-xs italic text-slate-500">{rule.documentNotes}</p> : null}
+                    <p className={`${OFFICIAL_BODY_CLASS} whitespace-pre-wrap break-words`}>{value}</p>
+                    {rule.documentNotes ? <p className={`mt-1 ${OFFICIAL_NOTE_CLASS}`}>{rule.documentNotes}</p> : null}
                   </div>
                 </div>
               </div>
@@ -490,16 +647,20 @@ export default function PolicyDraft({
     if (currentRenderMode === "legal-outline") {
       return (
         <div className="font-serif text-black">
-          <h3 className="pl-5 text-sm font-bold uppercase tracking-wide">{sectionIndex + 1}.{subIndex + 1} {subSection.name || "Policy Sub-section"}</h3>
-          <div className="mt-2 space-y-2 pl-5">
+          <h3 className="pl-5 text-base font-bold uppercase tracking-wide">{sectionIndex + 1}.{subIndex + 1} {subSection.name || "Policy Sub-section"}</h3>
+          <div className="mt-2 space-y-3 pl-5">
             {rules.map((rule, fieldIndex) => {
               const num = `${sectionIndex + 1}.${subIndex + 1}.${fieldIndex + 1}`;
               const value = formatValue(rule);
               const policyRequirement = operatorToPolicyRequirement(rule.operator, value);
               return (
-                <div key={rule.id || `${sectionIndex}-${subIndex}-legal-${fieldIndex}`} className="pl-5">
-                  <p className="font-mono text-sm">{num} {rule.fieldName || "Criteria"} - {policyRequirement}</p>
-                  {rule.documentNotes ? <p className="mt-1 pl-8 text-xs italic text-slate-600">{rule.documentNotes}</p> : null}
+                <div key={rule.id || `${sectionIndex}-${subIndex}-legal-${fieldIndex}`} className="pl-2">
+                  <p className="text-[15px] text-slate-900">{num} {rule.fieldName || "Criteria"}</p>
+                  {rule.documentNotes ? (
+                    <p className="mt-1 pl-7 text-sm italic text-slate-700 leading-relaxed">{rule.documentNotes}</p>
+                  ) : (
+                    <p className="mt-1 pl-7 text-sm italic text-slate-500">Requirement: {policyRequirement}</p>
+                  )}
                 </div>
               );
             })}
@@ -510,7 +671,7 @@ export default function PolicyDraft({
 
     if (currentRenderMode === "memo") {
       const sentences = rules.map((rule) => {
-        const value = formatValue(rule);
+        const value = getFullDisplayValue(rule);
         const main = `The ${rule.fieldName || "policy rule"} shall ${getOperatorTextForMemo(rule.operator)} ${value}.`;
         const extra = rule.documentNotes ? ` ${rule.documentNotes}` : "";
         return `${main}${extra}`;
@@ -519,8 +680,8 @@ export default function PolicyDraft({
       return (
         <div>
           <h3 className="mb-3 border-b-2 border-slate-800 pb-1 text-sm font-bold uppercase">{subSection.name || "Sub-section"}</h3>
-          {subSection.documentNotes ? <p className="mb-2 text-sm italic text-slate-700">{subSection.documentNotes}</p> : null}
-          <p className="text-justify text-sm leading-7 text-slate-800">{sentences.join(" ")}</p>
+          {subSection.documentNotes ? <p className={`mb-2 ${OFFICIAL_NOTE_CLASS}`}>{subSection.documentNotes}</p> : null}
+          <p className={`text-justify ${OFFICIAL_BODY_CLASS}`}>{sentences.join(" ")}</p>
         </div>
       );
     }
@@ -535,10 +696,14 @@ export default function PolicyDraft({
             return (
               <div key={rule.id || `${sectionIndex}-${subIndex}-check-${idx}`} className="border-b border-slate-100 py-1.5">
                 <div className="flex items-start">
-                  <span className="mr-3 inline-block h-4 w-4 flex-shrink-0 rounded-sm border-2 border-slate-400" />
-                  <p className="text-sm text-slate-800">{rule.fieldName || "Criteria"}: {requirement}</p>
+                  <span className="mr-3 mt-0.5 inline-block h-4 w-4 flex-shrink-0 rounded-sm border-2 border-slate-400" />
+                  <p className={OFFICIAL_RULE_TITLE_CLASS}>{rule.fieldName || "Criteria"}</p>
                 </div>
-                {rule.documentNotes ? <p className="mt-0.5 pl-7 text-xs italic text-slate-500">{rule.documentNotes}</p> : null}
+                {rule.documentNotes ? (
+                  <p className={`mt-1 pl-7 ${OFFICIAL_NOTE_CLASS}`}>{rule.documentNotes}</p>
+                ) : (
+                  <p className={`mt-1 pl-7 ${OFFICIAL_NOTE_CLASS}`}>Requirement: {requirement}</p>
+                )}
               </div>
             );
           })}
@@ -562,14 +727,17 @@ export default function PolicyDraft({
           ) : null}
           <div className="space-y-2 px-4 pb-2">
             {rules.map((rule, idx) => {
-              const value = formatValue(rule);
+              const value = getFullDisplayValue(rule);
               return (
                 <div key={rule.id || `${sectionIndex}-${subIndex}-card-${idx}`}>
-                  <p className="text-sm font-medium text-slate-800">{rule.fieldName || "Criteria"}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className={OFFICIAL_RULE_TITLE_CLASS}>{rule.fieldName || "Criteria"}</p>
+                  <p className={`${OFFICIAL_BODY_CLASS} leading-relaxed`}>
                     <span className="mr-1 rounded bg-slate-100 px-1.5 py-0.5">{rule.operator || "="}</span>
                     {value}
                   </p>
+                  {rule.documentNotes ? (
+                    <p className={`mt-1 ${OFFICIAL_NOTE_CLASS}`}>{rule.documentNotes}</p>
+                  ) : null}
                 </div>
               );
             })}
@@ -763,6 +931,7 @@ export default function PolicyDraft({
             </div>
           ) : (
             sections.map((section, sectionIndex) => {
+              const effectiveMode: RenderMode = sectionModes?.[section.id] ?? renderMode;
               const subSections = getSubSections(section);
               const pageNumber = sectionIndex + 3;
 
@@ -802,9 +971,17 @@ export default function PolicyDraft({
                         </select>
                       </div>
                     ) : (
-                      <h2 className="text-[19px] font-semibold">
-                        {sectionIndex + 1}. {section.name || "Major Policy Section"}
-                      </h2>
+                      <>
+                        <h2 className="text-[19px] font-semibold">
+                          {sectionIndex + 1}. {section.name || "Major Policy Section"}
+                        </h2>
+                        {onSectionModeChange && (
+                          <SectionModeBar
+                            currentMode={effectiveMode}
+                            onChange={(mode) => onSectionModeChange(section.id, mode)}
+                          />
+                        )}
+                      </>
                     )}
 
                     {isEditMode && (
@@ -842,7 +1019,7 @@ export default function PolicyDraft({
                     <p className="mb-4 text-sm leading-7 text-slate-700">{section.documentNotes}</p>
                   ) : null}
 
-                  <div className={renderMode === "card-grid" && !isEditMode ? "grid grid-cols-1 gap-4 md:grid-cols-2" : "space-y-6"}>
+                  <div className={effectiveMode === "card-grid" && !isEditMode ? "grid grid-cols-1 gap-4 md:grid-cols-2" : "space-y-6"}>
                     {subSections.length === 0 ? (
                       <p className="text-sm text-slate-600">No policy sub-sections are available.</p>
                     ) : (
@@ -892,7 +1069,7 @@ export default function PolicyDraft({
                                     <option value="table">Table View</option>
                                   </select>
                                 </div>
-                              ) : renderMode === "document" ? (
+                              ) : effectiveMode === "document" ? (
                                 <h3 className="text-base font-bold underline decoration-slate-700 underline-offset-4">
                                   {sectionIndex + 1}.{subIndex + 1} {subSection.name || "Policy Sub-section"}
                                 </h3>
@@ -941,13 +1118,13 @@ export default function PolicyDraft({
                                 rows={2}
                                 placeholder="Sub-section notes"
                               />
-                            ) : subSection.documentNotes && renderMode !== "memo" && renderMode !== "card-grid" && renderMode !== "two-column" ? (
+                            ) : subSection.documentNotes && effectiveMode !== "memo" && effectiveMode !== "card-grid" && effectiveMode !== "two-column" ? (
                               <p className="mb-3 text-sm leading-7 text-slate-700">{subSection.documentNotes}</p>
                             ) : null}
 
                             {!isEditMode ? (
                               <div className="space-y-3">
-                                {renderSubSection(subSection, sectionIndex, subIndex, renderMode)}
+                                {renderSubSection(subSection, sectionIndex, subIndex, effectiveMode)}
                               </div>
                             ) : (
                               <div className="space-y-2">

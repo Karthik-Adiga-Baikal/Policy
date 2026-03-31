@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { Tab } from "@/types";
 import { ChevronDown, ChevronUp, FileText } from "lucide-react";
-import PolicyDraft, { type PolicyDraftData, type RenderMode, VALID_RENDER_MODES } from "@/components/policy-builder/PolicyDraft";
-import RenderModeSelector from "@/components/policy-builder/RenderModeSelector";
+import PolicyDraft, { type PolicyDraftData, type RenderMode } from "@/components/policy-builder/PolicyDraft";
 
 interface LivePolicyDraftProps {
   policyId: string;
@@ -30,20 +29,7 @@ export default function LivePolicyDraft({
   storageKey,
 }: LivePolicyDraftProps) {
   const [isDraftOpen, setIsDraftOpen] = useState(true);
-  const [renderMode, setRenderMode] = useState<RenderMode>(() => {
-    if (typeof window === "undefined" || !storageKey) return "document";
-    const saved = localStorage.getItem(storageKey);
-    if (saved && VALID_RENDER_MODES.includes(saved as RenderMode)) {
-      return saved as RenderMode;
-    }
-    return "document";
-  });
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && storageKey) {
-      localStorage.setItem(storageKey, renderMode);
-    }
-  }, [renderMode, storageKey]);
+  const [renderMode] = useState<RenderMode>("table");
 
   const draftData = useMemo<PolicyDraftData>(
     () => ({
@@ -67,9 +53,6 @@ export default function LivePolicyDraft({
             <h3 className="text-sm font-semibold tracking-wide">Document Preview</h3>
           </div>
           <div className="flex items-center gap-2">
-            {isDraftOpen && (
-              <RenderModeSelector value={renderMode} onChange={setRenderMode} />
-            )}
             <button
               type="button"
               onClick={() => setIsDraftOpen((prev) => !prev)}
@@ -80,6 +63,10 @@ export default function LivePolicyDraft({
             </button>
           </div>
         </div>
+        
+        {isDraftOpen && (
+          <div className="mt-1.5 text-[11px] text-slate-500">View mode: Table (standardized)</div>
+        )}
       </div>
 
       {!isDraftOpen ? (
@@ -87,7 +74,10 @@ export default function LivePolicyDraft({
           Draft preview is closed. Click <span className="font-semibold">Open Draft</span> to view the policy.
         </div>
       ) : (
-        <PolicyDraft data={draftData} renderMode={renderMode} />
+        <PolicyDraft 
+          data={draftData} 
+          renderMode={renderMode} 
+        />
       )}
     </aside>
   );

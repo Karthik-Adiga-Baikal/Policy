@@ -1,8 +1,7 @@
 "use client";
 
 import { usePolicyStats } from "@/hooks/useAnalytics";
-import { Plus, Download, Shield, Clipboard, Search, MoreVertical } from "lucide-react";
-import Link from "next/link";
+import { Shield, Clipboard, Search, MoreVertical } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -63,49 +62,39 @@ export default function DashboardOverview() {
   }, [searchTerm, statusFilter, productFilter, policies]);
 
   const cards = [
-    { label: "Active Policies", value: stats?.published || 0, icon: <Shield className="text-green-600" size={20} />, color: "bg-green-50", change: "+2.5%" },
-    { label: "Pending Approval", value: stats?.inReview || 0, icon: <Clipboard className="text-orange-600" size={20} />, color: "bg-orange-50", change: "+4 new" },
+    { label: "Active Policies", value: stats?.published || 0, icon: <Shield className="text-green-600" size={20} />, color: "bg-green-50 border-green-100", change: "+2.5% this month" },
+    { label: "Pending Approval", value: stats?.inReview || 0, icon: <Clipboard className="text-amber-600" size={20} />, color: "bg-amber-50 border-amber-100", change: "+4 new" },
+    { label: "Total Drafts", value: stats?.draft || 0, icon: <Clipboard className="text-slate-500" size={20} />, color: "bg-white border-slate-200", change: "Draft pipeline" },
+    { label: "Published", value: stats?.published || 0, icon: <Shield className="text-blue-600" size={20} />, color: "bg-blue-50 border-blue-100", change: "Live in system" },
   ];
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-[1280px] mx-auto px-10 py-8 space-y-8">
+      <div>
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Policy Management</h1>
           <p className="text-sm text-gray-500 mt-1">Overview of active and draft lending criteria rules for automated decisioning.</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline">
-            <Download size={16} className="mr-2" />
-            Export Report
-          </Button>
-          <Button asChild>
-            <Link href="/dashboard/maker/create">
-              <Plus size={16} className="mr-2" />
-              Create New Policy
-            </Link>
-          </Button>
-        </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 justify-center items-center">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 justify-center items-center">
         {cards.map((card) => (
-          <Card key={card.label} className={card.color}>
+          <Card key={card.label} className={`${card.color} rounded-xl border hover:shadow-md transition-all duration-150`}>
             <CardContent className="p-6">
-              <div className="flex items-start justify-between mb-3">
-                <span className="text-sm text-gray-600">{card.label}</span>
+              <div className="flex items-start justify-between mb-4">
+                <span className="text-sm font-medium text-slate-600">{card.label}</span>
                 <div className="p-2 bg-white rounded-lg">{card.icon}</div>
               </div>
               <div className="flex items-end gap-2">
-                <span className="text-3xl font-bold text-gray-900">{isLoading ? "..." : card.value}</span>
-                <span className="text-sm text-green-600 mb-1">{card.change}</span>
+                <span className="text-3xl font-bold text-slate-900 tabular-nums">{isLoading ? "..." : card.value}</span>
+                <span className="text-xs text-slate-500 mb-1">{card.change}</span>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border shadow-sm p-6">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
         <div className="flex items-center gap-4 mb-6">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
@@ -174,13 +163,13 @@ export default function DashboardOverview() {
                   </TableCell>
                   <TableCell className="text-gray-600">{policy.version || "1.0"}</TableCell>
                   <TableCell>
-                    <Badge variant={
-                      policy.status === "PUBLISHED" ? "default" :
-                      policy.status === "DRAFT" ? "secondary" :
-                      "outline"
-                    }>
-                      {policy.status === "PUBLISHED" ? "Active" : policy.status === "DRAFT" ? "Draft" : "Under Review"}
-                    </Badge>
+                    {policy.status === "PUBLISHED" ? (
+                      <Badge className="rounded-full bg-teal-50 text-teal-700 border border-teal-200">Published</Badge>
+                    ) : policy.status === "DRAFT" ? (
+                      <Badge className="rounded-full bg-slate-100 text-slate-600 border border-slate-200">Draft</Badge>
+                    ) : (
+                      <Badge className="rounded-full bg-blue-50 text-blue-700 border border-blue-200">Under Review</Badge>
+                    )}
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>

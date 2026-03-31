@@ -3,7 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAppSelector } from "@/store/hooks";
-import Navbar from "@/components/layout/Navbar";
+import Sidebar from "@/components/layout/Sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "react-hot-toast";
 
 export default function DashboardLayout({
@@ -23,12 +24,12 @@ export default function DashboardLayout({
   if (!token) return null;
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
+    <SidebarProvider>
       <Toaster position="top-right" />
-      <Navbar user={user} />
-      <main className="flex-1 overflow-y-auto bg-slate-50/50">
-        {children}
-      </main>
-    </div>
+      <Sidebar user={user} />
+      <SidebarInset className="bg-gray-50">
+        <main className="h-screen overflow-y-auto bg-slate-50">{children}</main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

@@ -32,7 +32,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import FloatingChatBot from "@/components/policy-builder/FloatingChatBot";
-import PolicyDraft, { type RenderMode } from "@/components/policy-builder/PolicyDraft";
+import PolicyDraft, { type RenderMode, type SectionRenderModes } from "@/components/policy-builder/PolicyDraft";
 import RenderModeSelector from "@/components/policy-builder/RenderModeSelector";
 import AnalysisButton from "@/components/policy-builder/AnalysisButton";
 
@@ -49,6 +49,7 @@ export default function PolicyBuilderPage() {
   const [isPolicyInfoOpen, setIsPolicyInfoOpen] = useState(false);
   const [isDraftPanelOpen, setIsDraftPanelOpen] = useState(false);
   const [draftViewMode, setDraftViewMode] = useState<RenderMode>("document");
+  const [sectionModes, setSectionModes] = useState<SectionRenderModes>({});
   const [policy, setPolicy] = useState<any>(null);
   const [checkers, setCheckers] = useState<any[]>([]);
   const [versionChangeEnabled, setVersionChangeEnabled] = useState(false);
@@ -433,6 +434,8 @@ export default function PolicyBuilderPage() {
                   tabs: tabs as Tab[],
                 }}
                 renderMode={draftViewMode}
+                sectionModes={sectionModes}
+                onSectionModeChange={(tabId, mode) => setSectionModes(prev => ({ ...prev, [tabId]: mode }))}
               />
             </div>
           </div>

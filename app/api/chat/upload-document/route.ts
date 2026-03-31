@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { buildBackendAiUrl } from "@/lib/backendAiUrl";
 
 export async function POST(request: NextRequest) {
     try {
         // Forward the raw multipart form to the crewai-agent
         const formData = await request.formData();
         
-        const response = await fetch("http://localhost:8000/api/chat/upload-document", {
+        const response = await fetch(buildBackendAiUrl("/api/chat/upload-document"), {
             method: "POST",
             body: formData,
             // Do NOT set Content-Type — fetch sets it automatically with the boundary
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     } catch (error: any) {
         console.error("Upload proxy error:", error);
         return NextResponse.json(
-            { detail: "Could not connect to document processor. Is the AI server running on port 8000?" },
+            { detail: "Could not connect to document processor. Check BACKEND_AI_URL/NEXT_PUBLIC_BACKEND_AI_URL." },
             { status: 502 }
         );
     }

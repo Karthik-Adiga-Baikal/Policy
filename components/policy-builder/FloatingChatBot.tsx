@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
 import api from "@/lib/api";
+import { buildBackendAiUrl } from "@/lib/backendAiUrl";
 
 
 interface ChatMessage {
@@ -120,7 +121,7 @@ export default function FloatingChatBot({ currentPolicy, onPolicyUpdate, policyI
     setLoading(true);
 
     try {
-      const { data } = await api.post("http://localhost:8000/api/chat/policy-builder", {
+      const { data } = await api.post(buildBackendAiUrl("/api/chat/policy-builder"), {
         message: input,
         current_policy: currentPolicy,
       });

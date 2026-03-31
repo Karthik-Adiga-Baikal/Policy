@@ -1,5 +1,21 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment Variables
+
+Configure the AI backend URL in your `.env.local`:
+
+```bash
+# Used by server-side routes
+BACKEND_AI_URL=https://baikalsphere.com/policy-ai/api
+
+# Used by client-side components
+NEXT_PUBLIC_BACKEND_AI_URL=https://baikalsphere.com/policy-ai/api
+```
+
+Notes:
+- You can set either `.../policy-ai` or `.../policy-ai/api`; URL building de-duplicates `/api` automatically.
+- For production, use the hosted domain URL instead of localhost.
+
 ## Getting Started
 
 First, run the development server:

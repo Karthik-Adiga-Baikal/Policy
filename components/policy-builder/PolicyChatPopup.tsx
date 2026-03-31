@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import api from "@/lib/api";
+import { buildBackendAiUrl } from "@/lib/backendAiUrl";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Check, X, MessageCircle, Paperclip, Link as LinkIcon, Table2 } from "lucide-react";
-import PolicyDraft, { type RenderMode } from "./PolicyDraft";
+import PolicyDraft, { type RenderMode, type SectionRenderModes } from "./PolicyDraft";
 import RenderModeSelector from "./RenderModeSelector";
 
 interface ChatCitation {
@@ -107,6 +108,7 @@ export default function PolicyChatPopup({
   const [uploadingFile, setUploadingFile] = useState(false);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [viewMode, setViewMode] = useState<RenderMode>("document");
+  const [sectionModes, setSectionModes] = useState<SectionRenderModes>({});
   const [aiRepresentationHints, setAiRepresentationHints] = useState<RepresentationHint | null>(null);
   const [isViewModeOverridden, setIsViewModeOverridden] = useState(false);
 
@@ -263,7 +265,7 @@ export default function PolicyChatPopup({
     form.append("async", "false");
 
     const { data } = await api.post(
-      "http://localhost:8000/api/extraction/upload-policy",
+      buildBackendAiUrl("/api/extraction/upload-policy"),
       form,
       { headers: { "Content-Type": "multipart/form-data" } }
     );
@@ -657,10 +659,10 @@ export default function PolicyChatPopup({
       if (!subtabData.tabId) {
         throw new Error("Unable to resolve tabId for subtab. Add tabId or tabName in draft JSON.");
       }
-      
+
       const createdSubtab = await postJsonOrThrow("/subtab/create", subtabData);
       const createdSubtabId = createdSubtab?.data?.id || createdSubtab?.id;
-      
+
       if (action.subtab.fields && action.subtab.fields.length > 0 && createdSubtabId) {
         for (const field of action.subtab.fields) {
           await postJsonOrThrow("/field/create", { ...field, subTabId: createdSubtabId });
@@ -734,23 +736,23 @@ export default function PolicyChatPopup({
       }
 
       const policyMeta = currentPolicy?.policy || currentPolicy || {};
-      const { data } = await api.post("http://localhost:8000/api/chat/policy-builder", {
-            message: messageText,
-            current_policy: currentPolicy,
-            policy_name: policyMeta?.name,
-            policy_product: policyMeta?.product || policyMeta?.productType,
-            policy_description: policyMeta?.description,
-            current_draft: {
-              pending_action: generatedFromAttachment || pendingAction,
-              suggestions,
-              tab_name: (generatedFromAttachment || pendingAction)?.tab?.name || null,
-              representation: {
-                current_view_mode: viewMode,
-                user_overridden: isViewModeOverridden,
-                ai_suggested_mode: aiRepresentationHints?.suggestedDraftMode || null,
-              },
-            },
-          });
+      const { data } = await api.post(buildBackendAiUrl("/api/chat/policy-builder"), {
+        message: messageText,
+        current_policy: currentPolicy,
+        policy_name: policyMeta?.name,
+        policy_product: policyMeta?.product || policyMeta?.productType,
+        policy_description: policyMeta?.description,
+        current_draft: {
+          pending_action: generatedFromAttachment || pendingAction,
+          suggestions,
+          tab_name: (generatedFromAttachment || pendingAction)?.tab?.name || null,
+          representation: {
+            current_view_mode: viewMode,
+            user_overridden: isViewModeOverridden,
+            ai_suggested_mode: aiRepresentationHints?.suggestedDraftMode || null,
+          },
+        },
+      });
 
       const result = data?.result || {};
       const incomingHints = (result?.representation_hints || null) as RepresentationHint | null;
@@ -787,14 +789,14 @@ export default function PolicyChatPopup({
       setMessages((prev) => {
         const withoutTyping = prev.slice(0, -1);
         const aiMessage = result.message || "I've processed your request!";
-        
+
         // Make response more conversational
         let conversationalMessage = aiMessage;
         if (result.action && result.action.type !== "error") {
           const actionType = result.action.type.replace("create_", "").replace("_", " ");
           conversationalMessage = `Great! I've prepared a ${actionType} for you. You can review and edit it in the draft panel on the right. ${aiMessage}`;
         }
-        
+
         return [...withoutTyping, { role: "ai", content: conversationalMessage, suggestions: result.suggestions || null, citations: result.citations || [], table_data: result.table_data || null }];
 
       });
@@ -859,7 +861,7 @@ export default function PolicyChatPopup({
       }
 
       setSuggestions(result.suggestions || null);
-      
+
       // Add to suggestion history if suggestions exist
       if (result.suggestions) {
         setSuggestionHistory(prev => [...prev, {
@@ -867,7 +869,7 @@ export default function PolicyChatPopup({
           suggestions: result.suggestions
         }]);
       }
-      
+
       setDraftError(null);
     } catch {
       setMessages((prev) => {
@@ -1277,7 +1279,7 @@ export default function PolicyChatPopup({
                   {showSuggestions ? 'Hide' : 'Show'} Suggestions
                 </Button>
               </div>
-              
+
               {showSuggestions && (
                 <div className="mb-3 p-2 bg-blue-50 rounded border max-h-32 overflow-y-auto">
                   <h5 className="text-xs font-semibold mb-2">Suggestion History</h5>
@@ -1308,21 +1310,19 @@ export default function PolicyChatPopup({
                   )}
                 </div>
               )}
-              
+
               <div className="flex-1 overflow-y-auto space-y-3 mb-4 max-h-[calc(90vh-200px)]">
                 {messages.map((msg, i) => (
                   <div
                     key={i}
-                    className={`flex ${
-                      msg.role === "user" ? "justify-end" : "justify-start"
-                    }`}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"
+                      }`}
                   >
                     <div
-                      className={`max-w-[80%] p-3 rounded-lg ${
-                        msg.role === "user"
-                          ? "bg-blue-600 text-white rounded-br-sm"
-                          : "bg-gray-100 text-gray-800 rounded-bl-sm"
-                      }`}
+                      className={`max-w-[80%] p-3 rounded-lg ${msg.role === "user"
+                        ? "bg-blue-600 text-white rounded-br-sm"
+                        : "bg-gray-100 text-gray-800 rounded-bl-sm"
+                        }`}
                     >
                       {msg.role === "ai" && (
                         <div className="flex items-center gap-2 mb-1">
@@ -1339,16 +1339,15 @@ export default function PolicyChatPopup({
                       {/* Citations */}
                       {msg.role === "ai" && msg.citations && msg.citations.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
-                          <span className="text-xs text-gray-500 mr-1 flex items-center gap-1"><LinkIcon size={10}/> Referenced:</span>
+                          <span className="text-xs text-gray-500 mr-1 flex items-center gap-1"><LinkIcon size={10} /> Referenced:</span>
                           {msg.citations.map((c, ci) => (
                             <span
                               key={ci}
                               title={c.type === "field" ? `${c.tabName} › ${c.subtabName}` : c.tabName || ""}
-                              className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer ${
-                                c.type === "tab" ? "bg-blue-100 text-blue-700 hover:bg-blue-200" :
+                              className={`inline-flex items-center text-xs px-2 py-0.5 rounded-full font-medium cursor-pointer ${c.type === "tab" ? "bg-blue-100 text-blue-700 hover:bg-blue-200" :
                                 c.type === "subtab" ? "bg-violet-100 text-violet-700 hover:bg-violet-200" :
-                                "bg-green-100 text-green-700 hover:bg-green-200"
-                              }`}
+                                  "bg-green-100 text-green-700 hover:bg-green-200"
+                                }`}
                             >
                               {c.type === "tab" ? "§" : c.type === "subtab" ? "¶" : "#"} {c.name}
                             </span>
@@ -1377,7 +1376,7 @@ export default function PolicyChatPopup({
                           </table>
                         </div>
                       )}
-                      
+
                       {/* AI Suggestions */}
                       {msg.role === "ai" && msg.suggestions && (
                         <div className="mt-2 space-y-2">
@@ -1397,7 +1396,7 @@ export default function PolicyChatPopup({
                               </div>
                             </div>
                           )}
-                          
+
                           {msg.suggestions?.fields && msg.suggestions.fields.length > 0 && (
                             <div>
                               <p className="text-xs text-gray-600 mb-1">Would you also like me to create these fields?</p>
@@ -1425,8 +1424,8 @@ export default function PolicyChatPopup({
                       <div className="flex items-center gap-2">
                         <div className="flex space-x-1">
                           <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                         </div>
                         <span className="text-xs text-gray-500">AI is thinking...</span>
                       </div>
@@ -1557,7 +1556,13 @@ export default function PolicyChatPopup({
                         <h5 className="text-xs font-semibold text-gray-800">Draft Preview</h5>
                         <Table2 size={14} className="text-gray-500" />
                       </div>
-                      <PolicyDraft data={displayDraft || currentPolicyDraft} className="p-3" renderMode={viewMode} />
+                      <PolicyDraft
+                        data={displayDraft || currentPolicyDraft}
+                        className="p-3"
+                        renderMode={viewMode}
+                        sectionModes={sectionModes}
+                        onSectionModeChange={(tabId, mode) => setSectionModes(prev => ({ ...prev, [tabId]: mode }))}
+                      />
                     </div>
 
                     <div className="flex gap-2 mt-4">
@@ -1594,7 +1599,13 @@ export default function PolicyChatPopup({
                 <div className="space-y-3">
                   <div className="rounded-lg border bg-white p-3">
                     <p className="mb-2 text-xs font-semibold text-gray-700">Current Draft Preview</p>
-                    <PolicyDraft data={currentPolicyDraft} className="p-5" renderMode={viewMode} />
+                    <PolicyDraft
+                      data={currentPolicyDraft}
+                      className="p-5"
+                      renderMode={viewMode}
+                      sectionModes={sectionModes}
+                      onSectionModeChange={(tabId, mode) => setSectionModes(prev => ({ ...prev, [tabId]: mode }))}
+                    />
                   </div>
                   <div className="text-xs text-gray-500">
                     Ask AI to add, update, or delete sections. The preview will switch to pending AI changes automatically.
