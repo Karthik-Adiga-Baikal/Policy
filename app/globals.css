@@ -202,3 +202,56 @@ body {
   }
 }
 
+.policy-draft-editor .policy-draft-table,
+.policy-draft-editor table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0 1rem;
+  table-layout: fixed;
+  border: 1px solid #cbd5e1;
+  font-size: 0.95rem;
+}
+
+.policy-draft-editor .policy-draft-table-header,
+.policy-draft-editor th {
+  border: 1px solid #94a3b8;
+  background: #dbeafe;
+  color: #0f172a;
+  font-weight: 700;
+  text-align: left;
+  vertical-align: top;
+  padding: 0.45rem 0.6rem;
+}
+
+.policy-draft-editor .policy-draft-table-cell,
+.policy-draft-editor td {
+  border: 1px solid #cbd5e1;
+  padding: 0.42rem 0.6rem;
+  vertical-align: top;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.policy-draft-editor td p,
+.policy-draft-editor th p {
+  margin: 0;
+}
+
+.policy-draft-editor ul,
+.policy-draft-editor ol {
+  margin: 0.35rem 0 0.85rem;
+  padding-left: 1.35rem;
+}
+
+.policy-draft-editor ul {
+  list-style-type: disc;
+}
+
+.policy-draft-editor ol {
+  list-style-type: decimal;
+}
+
+.policy-draft-editor li {
+  margin: 0.18rem 0;
+}
+

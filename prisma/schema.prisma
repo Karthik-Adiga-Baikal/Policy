@@ -122,6 +122,7 @@ model PolicyEngine {
   checker       User?          @relation("Checker", fields: [checkerId], references: [id])
   
   tabs          Tab[]
+  blocks        PolicyBlock[]  @relation("PolicyBlocks")
   approvalQueue ApprovalQueue?
   auditLogs     AuditLog[]
   versions      PolicyVersion[]
@@ -208,12 +209,36 @@ model AuditLog {
 
 model PolicyVersion {
   id              String       @id @default(uuid())
-  versionNumber   String      
-  snapshotData    Json         
-  changeNote      String?      
+  versionNumber   String
+  snapshotData    Json
+  changeNote      String?
   policyEngineId  String
   policyEngine    PolicyEngine @relation(fields: [policyEngineId], references: [id])
   createdAt       DateTime     @default(now())
+}
+
+model PolicyBlock {
+  id           String        @id @default(cuid())
+  policyId     String
+  policy       PolicyEngine  @relation("PolicyBlocks", fields: [policyId], references: [id], onDelete: Cascade)
+  parentId     String?
+  parent       PolicyBlock?  @relation("BlockChildren", fields: [parentId], references: [id], onDelete: SetNull)
+  children     PolicyBlock[] @relation("BlockChildren")
+
+  type         String        // section, heading, paragraph, table, list, kv_pair, number_rule, divider
+  label        String?       // display name / section title
+  orderIndex   Float         // fractional indexing for drag-reorder
+  content      Json          // shape varies by type
+
+  numericValue Float?        // extracted from number_rule.value — for BRE queries
+  operator     String?       // extracted from number_rule.operator
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([policyId, orderIndex])
+  @@index([policyId, type])
+  @@index([parentId])
 }
 
 

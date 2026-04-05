@@ -42,6 +42,11 @@ interface DraftSubSection {
   id: string;
   name: string;
   documentNotes?: string | null;
+  tableData?: {
+    name?: string;
+    columns?: string[];
+    rows?: string[][];
+  } | null;
   fields?: DraftField[];
   subFields?: DraftField[];
   subfields?: DraftField[];
@@ -121,6 +126,10 @@ function operatorToPolicyRequirement(operator?: string | null, value?: string): 
   const cleanValue = value && value.trim() ? value.trim() : "";
   const op = String(operator || "=").trim().toLowerCase();
 
+  if (op === "raw" || op === "text" || op === "narrative") {
+    return cleanValue;
+  }
+
   if (!cleanValue) {
     if (op === ">=") return "must be at least";
     if (op === "<=") return "must not exceed";
@@ -176,6 +185,48 @@ function getSubSections(section: DraftSection): DraftSubSection[] {
 
 function getRules(subSection: DraftSubSection): DraftField[] {
   return subSection.fields || subSection.subFields || subSection.subfields || [];
+}
+
+function renderExtractedTable(subSection: DraftSubSection, bodyClassName: string) {
+  if (!subSection.tableData?.columns?.length || !subSection.tableData?.rows?.length) {
+    return null;
+  }
+
+  const tableColumns = subSection.tableData.columns;
+  const tableRows = subSection.tableData.rows;
+
+  return (
+    <div className="overflow-hidden rounded-md border border-slate-300">
+      <table className="w-full border-collapse text-left text-sm">
+        <thead className="bg-slate-100">
+          <tr>
+            {tableColumns.map((column, columnIndex) => (
+              <th
+                key={`${subSection.id}-col-${columnIndex}`}
+                className="border-b border-slate-300 px-4 py-3 font-semibold text-slate-700"
+              >
+                {column || `Column ${columnIndex + 1}`}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {tableRows.map((row, rowIndex) => (
+            <tr key={`${subSection.id}-row-${rowIndex}`} className={rowIndex % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+              {tableColumns.map((_, columnIndex) => (
+                <td
+                  key={`${subSection.id}-cell-${rowIndex}-${columnIndex}`}
+                  className="border-b border-slate-200 px-4 py-3 align-top break-words"
+                >
+                  <p className={bodyClassName}>{row?.[columnIndex] || ""}</p>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 const OFFICIAL_BODY_CLASS = "text-sm leading-8 text-slate-800";
@@ -491,12 +542,17 @@ export default function PolicyDraft({
     currentRenderMode: RenderMode
   ): JSX.Element {
     const rules = getRules(subSection);
+    const extractedTable = renderExtractedTable(subSection, OFFICIAL_BODY_CLASS);
 
-    if (rules.length === 0) {
+    if (rules.length === 0 && !extractedTable) {
       return <p className="text-sm text-slate-600">No criteria listed.</p>;
     }
 
     if (currentRenderMode === "document") {
+      if (extractedTable) {
+        return extractedTable;
+      }
+
       return (
         <div className="space-y-2">
           {rules.map((rule, idx) => {
@@ -518,6 +574,10 @@ export default function PolicyDraft({
     }
 
     if (currentRenderMode === "table") {
+      if (extractedTable) {
+        return extractedTable;
+      }
+
       return (
         <div className="overflow-hidden rounded-md border border-slate-300">
           <table className="w-full border-collapse text-left text-sm">
@@ -532,6 +592,7 @@ export default function PolicyDraft({
               {rules.map((rule, idx) => {
                 const value = getFullDisplayValue(rule);
                 const requirement = operatorToPolicyRequirement(rule.operator, value);
+                const notesValue = rule.documentNotes || getNarrativeContent(rule) || "-";
                 return (
                   <tr key={rule.id || `${sectionIndex}-${subIndex}-table-${idx}`} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
                     <td className="border-r border-b border-slate-200 px-4 py-3 align-top break-words">
@@ -541,7 +602,7 @@ export default function PolicyDraft({
                       <p className={OFFICIAL_BODY_CLASS}>{requirement || "-"}</p>
                     </td>
                     <td className="border-b border-slate-200 px-4 py-3 align-top break-words">
-                      <p className={OFFICIAL_NOTE_CLASS}>{rule.documentNotes || getNarrativeContent(rule) || "-"}</p>
+                      <p className={OFFICIAL_NOTE_CLASS}>{notesValue}</p>
                     </td>
                   </tr>
                 );
@@ -1069,12 +1130,10 @@ export default function PolicyDraft({
                                     <option value="table">Table View</option>
                                   </select>
                                 </div>
-                              ) : effectiveMode === "document" ? (
+                              ) : (
                                 <h3 className="text-base font-bold underline decoration-slate-700 underline-offset-4">
                                   {sectionIndex + 1}.{subIndex + 1} {subSection.name || "Policy Sub-section"}
                                 </h3>
-                              ) : (
-                                <div />
                               )}
 
                               {isEditMode && (

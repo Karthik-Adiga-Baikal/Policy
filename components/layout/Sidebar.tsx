@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppDispatch } from "@/store/hooks";
 import { logout, type AuthUser } from "@/store/slices/authSlice";
-import { LayoutDashboard, FilePlus, ClipboardList, Database, History, ShieldCheck, ScrollText, FlaskConical, LogOut, User as UserIcon, ChevronsUpDown, ChevronRight } from "lucide-react";
+import { LayoutDashboard, FilePlus, ClipboardList, Database, History, ShieldCheck, ScrollText, FlaskConical, LogOut, User as UserIcon, ChevronsUpDown, ChevronRight, Zap, FileText } from "lucide-react";
 import { Sidebar as AppShellSidebar, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,89 +18,238 @@ export default function Sidebar({ user }: { user: AuthUser | null }) {
   const isChecker = role === "CHECKER";
   const isAdmin = role === "ADMIN" || role === "IT_ADMIN";
 
-  const menuItems = [
-    { name: "Overview", href: "/dashboard", icon: <LayoutDashboard size={18} /> },
-    { name: "Versions", href: "/dashboard/versions", icon: <History size={18} /> },
-    { name: "Audit Log", href: "/dashboard/audit-log", icon: <ScrollText size={18} /> },
-    { name: "Simulation", href: "/dashboard/simulation", icon: <FlaskConical size={18} /> },
-    ...(isMaker
-      ? [
-          { name: "My Policies", href: "/dashboard/maker", icon: <Database size={18} /> },
-          { name: "Create Policy", href: "/dashboard/maker/create", icon: <FilePlus size={18} /> },
-        ] 
-      : []),
-    ...(isChecker
-      ? [
-          { name: "Approval Queue", href: "/dashboard/checker/queue", icon: <ClipboardList size={18} /> },
-        ] 
-      : []),
-    ...(isAdmin ? [{ name: "Admin", href: "/dashboard/admin", icon: <ShieldCheck size={18} /> }] : []),
+  const coreMenuItems = [
+    { name: "Overview", href: "/dashboard", icon: LayoutDashboard, badge: "new", color: "from-indigo-500 to-indigo-600" },
+    { name: "Policy Detail", href: "/dashboard/policy-detail", icon: FileText, color: "from-cyan-500 to-cyan-600" },
+    { name: "Versions", href: "/dashboard/versions", icon: History, color: "from-slate-500 to-slate-600" },
+    { name: "Audit Log", href: "/dashboard/audit-log", icon: ScrollText, color: "from-blue-500 to-blue-600" },
+    { name: "Simulation", href: "/dashboard/simulation", icon: FlaskConical, color: "from-purple-500 to-purple-600" },
   ];
+
+  const makerMenuItems = isMaker ? [
+    { name: "My Policies", href: "/dashboard/maker", icon: Database, color: "from-amber-500 to-amber-600" },
+    { name: "Create Policy", href: "/dashboard/maker/create", icon: FilePlus, color: "from-emerald-500 to-emerald-600", badge: "pro" },
+  ] : [];
+
+  const checkerMenuItems = isChecker ? [
+    { name: "Approval Queue", href: "/dashboard/checker/queue", icon: ClipboardList, color: "from-rose-500 to-rose-600", badge: "priority" },
+  ] : [];
+
+  const adminMenuItems = isAdmin ? [
+    { name: "Admin Panel", href: "/dashboard/admin", icon: ShieldCheck, color: "from-red-500 to-red-600" },
+  ] : [];
+
+  const allMenuItems = [...coreMenuItems, ...makerMenuItems, ...checkerMenuItems, ...adminMenuItems];
 
   return (
     <AppShellSidebar
       collapsible="icon"
-      className="bg-white text-slate-900 border-r border-slate-200 shadow-sm [--sidebar:#ffffff] [--sidebar-foreground:#0f172a] [--sidebar-primary:#0f172a] [--sidebar-primary-foreground:#ffffff] [--sidebar-accent:#f1f5f9] [--sidebar-accent-foreground:#0f172a] [--sidebar-border:#e2e8f0]"
+      className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 text-white border-r border-slate-800/50 shadow-2xl [--sidebar:#0f172a] [--sidebar-foreground:#f1f5f9] [--sidebar-primary:#6366f1] [--sidebar-primary-foreground:#ffffff] [--sidebar-accent:#1e293b] [--sidebar-accent-foreground:#cbd5e1] [--sidebar-border:#1e293b]"
     >
-      <div className={`h-14 border-b border-sidebar-border px-3 flex items-center ${open ? "justify-between" : "justify-center"} gap-2`}>
+      {/* Header */}
+      <div className={`h-16 border-b border-slate-800/50 px-3 flex items-center ${open ? "justify-between" : "justify-center"} gap-2 bg-gradient-to-r from-slate-800/50 to-transparent`}>
         {open ? (
           <>
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center text-white flex-shrink-0">
-                <ShieldCheck size={16} />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-lg">
+                <ShieldCheck size={20} className="drop-shadow-lg" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-sidebar-foreground truncate">Policy Manager</p>
-                <p className="text-[10px] uppercase tracking-wider text-slate-400 truncate">Enterprise</p>
+                <p className="text-sm font-bold text-white truncate">Policy Manager</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 truncate">v1.0 Enterprise</p>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <SidebarTrigger className="h-7 w-7 rounded-md hover:bg-slate-100" />
-              <ChevronsUpDown size={16} className="text-sidebar-foreground" />
-            </div>
+            <SidebarTrigger className="h-8 w-8 rounded-lg hover:bg-slate-700/50 transition-colors" />
           </>
         ) : (
-          <SidebarTrigger className="h-8 w-8 rounded-md hover:bg-slate-100" />
+          <SidebarTrigger className="h-8 w-8 rounded-lg hover:bg-slate-700/50 transition-colors" />
         )}
       </div>
 
-      {open && (
-        <div className="px-3 pt-3 text-xs uppercase tracking-wide font-semibold text-sidebar-foreground/80">Platform</div>
-      )}
-      
-      <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-        {menuItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            title={item.name}
-            className={`flex items-center ${open ? "justify-between" : "justify-center"} gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              pathname === item.href 
-                ? "bg-indigo-50 text-indigo-600" 
-                : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
-            }`}
-          >
-            <div className={`flex items-center gap-3 min-w-0 ${open ? "" : "w-full justify-center"}`}>
-              <span className={pathname === item.href ? "text-indigo-600" : "text-slate-400"}>{item.icon}</span>
-              {open && <span className="truncate">{item.name}</span>}
+      {/* Navigation Sections */}
+      <nav className="flex-1 p-3 space-y-6 overflow-y-auto scrollbar-hide">
+        {/* Core Section */}
+        {open && (
+          <div>
+            <div className="px-3 text-xs uppercase tracking-widest font-bold text-slate-500 mb-3 flex items-center gap-2">
+              <div className="h-px flex-1 bg-gradient-to-r from-slate-700 to-transparent" />
+              Core
             </div>
-            {open && <ChevronRight size={14} className="text-slate-300" />}
-          </Link>
-        ))}
+            <div className="space-y-1">
+              {coreMenuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`group relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 overflow-hidden ${
+                      isActive
+                        ? "bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/20"
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/50"
+                    }`}
+                  >
+                    {!isActive && <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/0 via-indigo-600/0 to-indigo-600/0 group-hover:from-slate-700/50 group-hover:via-slate-700/25 transition-all" />}
+                    <div className="relative flex items-center gap-3 min-w-0">
+                      <div className={`p-2 rounded-lg transition-all ${isActive ? "bg-white/20" : "bg-slate-700/40 group-hover:bg-slate-700"}`}>
+                        <Icon size={18} />
+                      </div>
+                      <span className="truncate">{item.name}</span>
+                    </div>
+                    {isActive && <ChevronRight size={16} className="flex-shrink-0" />}
+                    {item.badge && (
+                      <Badge className="text-[9px] px-1.5 py-0 ml-auto flex-shrink-0 bg-indigo-400/20 text-indigo-200 border-indigo-400/40">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Maker Section */}
+        {makerMenuItems.length > 0 && (
+          <div>
+            {open && (
+              <p className="px-3 text-xs uppercase tracking-widest font-bold text-slate-500 mb-3 flex items-center gap-2">
+                <Zap size={12} />
+                <span>Maker</span>
+                <div className="h-px flex-1 bg-gradient-to-r from-slate-700 to-transparent" />
+              </p>
+            )}
+            <div className="space-y-1">
+              {makerMenuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`group relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 overflow-hidden ${
+                      isActive
+                        ? "bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/20"
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/50"
+                    }`}
+                  >
+                    {!isActive && <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/0 via-emerald-600/0 to-emerald-600/0 group-hover:from-slate-700/50 group-hover:via-slate-700/25 transition-all" />}
+                    <div className="relative flex items-center gap-3 min-w-0">
+                      <div className={`p-2 rounded-lg transition-all ${isActive ? "bg-white/20" : "bg-slate-700/40 group-hover:bg-slate-700"}`}>
+                        <Icon size={18} />
+                      </div>
+                      <span className="truncate">{item.name}</span>
+                    </div>
+                    {isActive && <ChevronRight size={16} className="flex-shrink-0" />}
+                    {item.badge && (
+                      <Badge className="text-[9px] px-1.5 py-0 ml-auto flex-shrink-0 bg-emerald-400/20 text-emerald-200 border-emerald-400/40">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Checker Section */}
+        {checkerMenuItems.length > 0 && (
+          <div>
+            {open && (
+              <p className="px-3 text-xs uppercase tracking-widest font-bold text-slate-500 mb-3 flex items-center gap-2">
+                <FileText size={12} />
+                <span>Checker</span>
+                <div className="h-px flex-1 bg-gradient-to-r from-slate-700 to-transparent" />
+              </p>
+            )}
+            <div className="space-y-1">
+              {checkerMenuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`group relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 overflow-hidden ${
+                      isActive
+                        ? "bg-gradient-to-r from-rose-600 to-rose-500 text-white shadow-lg shadow-rose-500/20"
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/50"
+                    }`}
+                  >
+                    {!isActive && <div className="absolute inset-0 bg-gradient-to-r from-rose-600/0 via-rose-600/0 to-rose-600/0 group-hover:from-slate-700/50 group-hover:via-slate-700/25 transition-all" />}
+                    <div className="relative flex items-center gap-3 min-w-0">
+                      <div className={`p-2 rounded-lg transition-all ${isActive ? "bg-white/20" : "bg-slate-700/40 group-hover:bg-slate-700"}`}>
+                        <Icon size={18} />
+                      </div>
+                      <span className="truncate">{item.name}</span>
+                    </div>
+                    {isActive && <ChevronRight size={16} className="flex-shrink-0" />}
+                    {item.badge && (
+                      <Badge className="text-[9px] px-1.5 py-0 ml-auto flex-shrink-0 bg-rose-400/20 text-rose-200 border-rose-400/40 animate-pulse">
+                        {item.badge}
+                      </Badge>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Admin Section */}
+        {adminMenuItems.length > 0 && (
+          <div>
+            {open && (
+              <p className="px-3 text-xs uppercase tracking-widest font-bold text-slate-500 mb-3 flex items-center gap-2">
+                <ShieldCheck size={12} />
+                <span>Admin</span>
+                <div className="h-px flex-1 bg-gradient-to-r from-slate-700 to-transparent" />
+              </p>
+            )}
+            <div className="space-y-1">
+              {adminMenuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`group relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 overflow-hidden ${
+                      isActive
+                        ? "bg-gradient-to-r from-red-600 to-red-500 text-white shadow-lg shadow-red-500/20"
+                        : "text-slate-300 hover:text-white hover:bg-slate-800/50"
+                    }`}
+                  >
+                    {!isActive && <div className="absolute inset-0 bg-gradient-to-r from-red-600/0 via-red-600/0 to-red-600/0 group-hover:from-slate-700/50 group-hover:via-slate-700/25 transition-all" />}
+                    <div className="relative flex items-center gap-3 min-w-0">
+                      <div className={`p-2 rounded-lg transition-all ${isActive ? "bg-white/20" : "bg-slate-700/40 group-hover:bg-slate-700"}`}>
+                        <Icon size={18} />
+                      </div>
+                      <span className="truncate">{item.name}</span>
+                    </div>
+                    {isActive && <ChevronRight size={16} className="flex-shrink-0" />}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </nav>
 
-      <div className="p-3 border-t border-sidebar-border">
-        <div
-          className={`mb-2 border border-sidebar-border ${open ? "bg-sidebar-accent rounded-lg p-3" : "bg-transparent border-0 p-0 flex justify-center"}`}
-        >
-          <div className={`flex items-center ${open ? "justify-between w-full" : "justify-center"} gap-2`}>
-            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-fuchsia-500 to-indigo-600 flex items-center justify-center text-white">
-              <UserIcon size={22} />
+      {/* User Section */}
+      <div className="p-3 border-t border-slate-800/50 bg-gradient-to-r from-slate-800/50 to-transparent space-y-3">
+        <div className={`rounded-xl p-3 border border-slate-700/50 bg-gradient-to-br from-slate-800/50 to-slate-900/50 transition-all hover:border-slate-600/50`}>
+          <div className={`flex items-center ${open ? "gap-3" : "justify-center"}`}>
+            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-indigo-500 via-purple-500 to-indigo-600 flex items-center justify-center text-white flex-shrink-0 shadow-lg ring-2 ring-slate-700/50">
+              <UserIcon size={20} />
             </div>
             {open && (
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name || "User"}</p>
-                <Badge variant="secondary" className="text-[10px] mt-1 bg-sidebar-primary text-sidebar-primary-foreground border-0">{role || "USER"}</Badge>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white truncate">{user?.name || "User"}</p>
+                <Badge className="text-[10px] mt-1 bg-indigo-500/30 text-indigo-200 border-indigo-400/50 font-medium">
+                  {role || "USER"}
+                </Badge>
               </div>
             )}
           </div>
@@ -108,19 +257,13 @@ export default function Sidebar({ user }: { user: AuthUser | null }) {
 
         <Button
           variant="ghost"
-          className={`w-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 ${open ? "justify-start" : "justify-center rounded-lg h-10 w-10 mx-auto"}`}
+          className={`w-full transition-all text-slate-400 hover:text-white hover:bg-slate-700/50 ${open ? "justify-start" : "justify-center h-10 w-10 p-0 mx-auto"}`}
           title="Logout"
           onClick={() => dispatch(logout())}
         >
           <LogOut size={18} />
           {open && <span className="ml-2">Logout</span>}
         </Button>
-
-        {open && (
-          <p className="mt-2 text-[11px] text-sidebar-foreground/80">
-            Role: <span className="font-semibold text-sidebar-foreground">{role || "USER"}</span>
-          </p>
-        )}
       </div>
     </AppShellSidebar>
   );

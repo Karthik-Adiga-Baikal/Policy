@@ -50,6 +50,40 @@ interface ExtractionTriple {
   section?: string;
 }
 
+interface ExtractedPolicyItem {
+  name?: string;
+  type?: string;
+  value?: unknown;
+  values?: unknown[];
+  columns?: string[];
+  rows?: unknown[][];
+  children?: unknown[];
+}
+
+interface ExtractedTableData {
+  name?: string;
+  columns: string[];
+  rows: string[][];
+}
+
+interface ExtractedPolicyGroup {
+  group_name?: string;
+  items?: ExtractedPolicyItem[];
+}
+
+interface ExtractedPolicySection {
+  section_name?: string;
+  groups?: ExtractedPolicyGroup[];
+  items?: ExtractedPolicyItem[];
+}
+
+interface ExtractedPolicyDocument {
+  name?: string;
+  version?: string | number | null;
+  release_date?: string | null;
+  sections?: ExtractedPolicySection[];
+}
+
 interface RepresentationHint {
   suggestedDraftMode: "document" | "table" | "mixed";
   confidence?: number;
@@ -173,6 +207,235 @@ export default function PolicyChatPopup({
     return "table" as const;
   };
 
+  const toText = (value: unknown): string => {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string") return normalizeSpace(value);
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    if (Array.isArray(value)) {
+      return value.map((item) => toText(item)).filter(Boolean).join(" ");
+    }
+    if (typeof value === "object") {
+      try {
+        return normalizeSpace(JSON.stringify(value));
+      } catch {
+        return "";
+      }
+    }
+    return "";
+  };
+
+  const toListText = (values: unknown[]): string => {
+    const entries = (values || []).map((entry) => toText(entry)).filter(Boolean);
+    if (entries.length === 0) return "";
+    return entries.map((entry, index) => `${index + 1}. ${entry}`).join("\n");
+  };
+
+  const inferStructuredSectionMode = (section: ExtractedPolicySection): "document" | "table" => {
+    const allItems = [
+      ...(Array.isArray(section?.items) ? section.items : []),
+      ...((section?.groups || []).flatMap((group) => (Array.isArray(group?.items) ? group.items : []))),
+    ];
+
+    const tableCount = allItems.filter((item) => String(item?.type || "").toLowerCase() === "table").length;
+    const longTextCount = allItems.filter((item) => {
+      const type = String(item?.type || "").toLowerCase();
+      if (type !== "string") return false;
+      const text = toText(item?.value);
+      return text.length >= 180;
+    }).length;
+
+    const listCount = allItems.filter((item) => String(item?.type || "").toLowerCase() === "list").length;
+
+    if (tableCount > 0 && tableCount >= longTextCount) return "table";
+    if (longTextCount >= 1 && tableCount === 0) return "document";
+    if (listCount > 0 && tableCount === 0) return "document";
+    return tableCount > 0 ? "table" : "document";
+  };
+
+  const mapDocumentItemToFields = (item: ExtractedPolicyItem, fallbackName: string) => {
+    const itemType = String(item?.type || "string").toLowerCase();
+    const itemName = normalizeSpace(item?.name ? String(item.name) : "") || fallbackName;
+
+    if (itemType === "table") {
+      const columns = Array.isArray(item?.columns) ? item.columns.map((col) => normalizeSpace(col)) : [];
+      const rows = Array.isArray(item?.rows) ? item.rows : [];
+      const safeColumns = columns.filter(Boolean);
+      const descriptionIndex = safeColumns.length > 0 ? safeColumns.length - 1 : -1;
+
+      return rows.map((row, rowIndex) => {
+        const normalizedRow = Array.isArray(row) ? row.map((cell) => toText(cell)) : [];
+        const srNo = normalizeSpace(normalizedRow[0] || "");
+        const criteriaCell = normalizeSpace(normalizedRow[1] || normalizedRow[0] || `Row ${rowIndex + 1}`);
+
+        const descriptionCell =
+          descriptionIndex >= 0
+            ? normalizeSpace(normalizedRow[descriptionIndex] || "")
+            : normalizeSpace(normalizedRow[normalizedRow.length - 1] || "");
+
+        const contextCells = normalizedRow
+          .map((value, idx) => ({ value: normalizeSpace(value), idx }))
+          .filter(({ value, idx }) => value && idx !== 0 && idx !== 1 && idx !== descriptionIndex)
+          .map(({ value, idx }) => {
+            const colLabel = safeColumns[idx] || `Column ${idx + 1}`;
+            return `${colLabel}: ${value}`;
+          });
+
+        return {
+          fieldName: criteriaCell || `${itemName} Row ${rowIndex + 1}`,
+          fieldType: toFieldType(descriptionCell),
+          operator: "raw",
+          thresholdValue: descriptionCell || contextCells.join(" | "),
+          fieldValues: descriptionCell || contextCells.join(" | "),
+          orderIndex: rowIndex,
+          displayMode: "table" as const,
+          documentNotes: [srNo ? `Sr. No: ${srNo}` : "", ...contextCells].filter(Boolean).join(" | "),
+          rules: itemName,
+        };
+      });
+    }
+
+    if (itemType === "list") {
+      const listText = toListText(Array.isArray(item?.values) ? item.values : []);
+      return [
+        {
+          fieldName: itemName,
+          fieldType: "text",
+          operator: "raw",
+          thresholdValue: "",
+          fieldValues: listText,
+          displayMode: "document" as const,
+          documentNotes: listText,
+          rules: itemName,
+        },
+      ];
+    }
+
+    const valueText = toText(item?.value) || toListText(Array.isArray(item?.values) ? item.values : []);
+    const displayMode = valueText.length >= 160 ? "document" : "table";
+    return [
+      {
+        fieldName: itemName,
+        fieldType: toFieldType(valueText),
+        operator: displayMode === "document" ? "raw" : "=",
+        thresholdValue: displayMode === "table" ? valueText : "",
+        fieldValues: displayMode === "document" ? valueText : valueText,
+        displayMode,
+        documentNotes: valueText,
+        rules: itemName,
+      },
+    ];
+  };
+
+  const normalizeTableData = (item: ExtractedPolicyItem, fallbackName: string): ExtractedTableData | null => {
+    const itemType = String(item?.type || "").toLowerCase();
+    if (itemType !== "table") return null;
+
+    const columns = Array.isArray(item?.columns)
+      ? item.columns.map((col) => normalizeSpace(col)).filter(Boolean)
+      : [];
+    const rows = Array.isArray(item?.rows) ? item.rows : [];
+    if (columns.length === 0 || rows.length === 0) return null;
+
+    const seenColumns = new Set<string>();
+    const uniqueColumns: string[] = [];
+    const duplicateIndices: number[] = [];
+
+    columns.forEach((col, idx) => {
+      const normalized = col.toLowerCase().replace(/_\d+$/, "");
+      if (!seenColumns.has(normalized)) {
+        seenColumns.add(normalized);
+        uniqueColumns.push(col);
+      } else {
+        duplicateIndices.push(idx);
+      }
+    });
+
+    const cleanedRows = rows.map((row) => {
+      const normalizedRow = Array.isArray(row) ? row.map((cell) => toText(cell)) : [];
+      return normalizedRow.filter((_, idx) => !duplicateIndices.includes(idx));
+    });
+
+    return {
+      name: normalizeSpace(item?.name ? String(item.name) : "") || fallbackName,
+      columns: uniqueColumns,
+      rows: cleanedRows,
+    };
+  };
+
+  const buildActionFromDocumentSchema = (
+    policyName: string,
+    policyDocument: ExtractedPolicyDocument,
+    filename: string,
+  ) => {
+    const sections = Array.isArray(policyDocument?.sections) ? policyDocument.sections : [];
+
+    const subtabs = sections.map((section, sectionIndex) => {
+      const sectionName = normalizeSpace(section?.section_name || `Section ${sectionIndex + 1}`);
+      const groups = Array.isArray(section?.groups) ? section.groups : [];
+      const sectionItems = Array.isArray(section?.items) ? section.items : [];
+      const combinedGroups: ExtractedPolicyGroup[] = [
+        ...groups,
+        ...(sectionItems.length > 0 ? [{ group_name: "Details", items: sectionItems }] : []),
+      ];
+
+      const fields = combinedGroups.flatMap((group, groupIndex) => {
+        const groupItems = Array.isArray(group?.items) ? group.items : [];
+        const fallbackName = normalizeSpace(group?.group_name || `Group ${groupIndex + 1}`);
+        return groupItems.flatMap((item) => mapDocumentItemToFields(item, fallbackName));
+      });
+
+      const firstTable = combinedGroups
+        .flatMap((group, groupIndex) => {
+          const groupItems = Array.isArray(group?.items) ? group.items : [];
+          const fallbackName = normalizeSpace(group?.group_name || `Group ${groupIndex + 1}`);
+          return groupItems
+            .map((item) => normalizeTableData(item, fallbackName))
+            .filter((table): table is ExtractedTableData => Boolean(table));
+        })
+        .find((table) => table.columns.length > 0 && table.rows.length > 0);
+
+      const sectionMode = inferStructuredSectionMode(section);
+      const representativeNarrative = fields
+        .map((field) => normalizeSpace(String(field?.documentNotes || field?.fieldValues || "")))
+        .find((text) => text.length >= 180);
+
+      const groupNames = combinedGroups
+        .map((group) => normalizeSpace(group?.group_name || ""))
+        .filter(Boolean);
+
+      return {
+        name: sectionName,
+        orderIndex: sectionIndex,
+        documentNotes:
+          representativeNarrative ||
+          (groupNames.length > 0
+            ? `Includes: ${groupNames.join(", ")}`
+            : `Extracted from ${filename}`),
+        displayMode: sectionMode,
+        tableData: firstTable || null,
+        fields: fields.map((field, fieldIndex) => ({
+          ...field,
+          orderIndex: fieldIndex,
+        })),
+      };
+    });
+
+    return {
+      type: "create_nested_structure",
+      tab: {
+        name:
+          policyName ||
+          normalizeSpace(policyDocument?.name || "") ||
+          currentPolicy?.name ||
+          currentPolicy?.policy?.name ||
+          "Extracted Policy",
+        orderIndex: 0,
+        documentNotes: `Auto-generated from uploaded file: ${filename}`,
+      },
+      subtabs,
+    };
+  };
+
   const buildActionFromExtraction = (
     policyName: string,
     triples: ExtractionTriple[],
@@ -272,19 +535,49 @@ export default function PolicyChatPopup({
 
     const result = data?.result || {};
     const extractionTriples: ExtractionTriple[] = Array.isArray(result?.triples) ? result.triples : [];
-    const extractedPolicyName = String(result?.policy_name || "").trim() || file.name.replace(/\.[^.]+$/, "");
+    const policyDocument: ExtractedPolicyDocument | null = result?.policy_document && typeof result.policy_document === "object"
+      ? result.policy_document
+      : null;
 
-    if (!result?.success || extractionTriples.length === 0) {
-      throw new Error("Extraction completed but no structured triples were found.");
+    const extractedPolicyName =
+      normalizeSpace(result?.policy_name) ||
+      normalizeSpace(policyDocument?.name) ||
+      file.name.replace(/\.[^.]+$/, "");
+
+    const extractionSucceeded =
+      result?.success === true ||
+      String(result?.status || "").toUpperCase() === "COMPLETE";
+
+    if (!extractionSucceeded) {
+      throw new Error("Extraction failed. Please retry with a clearer PDF/DOCX.");
     }
 
-    const action = buildActionFromExtraction(extractedPolicyName, extractionTriples, file.name);
-    const sectionCount = Array.isArray(action?.subtabs) ? action.subtabs.length : 0;
+    if (policyDocument?.sections?.length) {
+      const action = buildActionFromDocumentSchema(extractedPolicyName, policyDocument, file.name);
+      const sectionCount = Array.isArray(action?.subtabs) ? action.subtabs.length : 0;
+      const tableCount = (policyDocument.sections || []).reduce((acc, section) => {
+        const groupItems = (section.groups || []).flatMap((group) => (Array.isArray(group.items) ? group.items : []));
+        const sectionItems = Array.isArray(section.items) ? section.items : [];
+        const allItems = [...groupItems, ...sectionItems];
+        return acc + allItems.filter((item) => String(item?.type || "").toLowerCase() === "table").length;
+      }, 0);
 
-    return {
-      action,
-      summary: `Analyzed '${file.name}'. Extracted ${extractionTriples.length} structured points across ${sectionCount} policy sections for '${extractedPolicyName}'. Review the draft on the right and click Add to Policy to save in Prisma.`,
-    };
+      return {
+        action,
+        summary: `Analyzed '${file.name}'. Mapped ${sectionCount} sections from the new document schema (${tableCount} tables detected) for '${extractedPolicyName}'. Review the draft on the right and click Add to Policy to save in Prisma.`,
+      };
+    }
+
+    if (extractionTriples.length > 0) {
+      const action = buildActionFromExtraction(extractedPolicyName, extractionTriples, file.name);
+      const sectionCount = Array.isArray(action?.subtabs) ? action.subtabs.length : 0;
+      return {
+        action,
+        summary: `Analyzed '${file.name}'. Extracted ${extractionTriples.length} structured points across ${sectionCount} policy sections for '${extractedPolicyName}'. Review the draft on the right and click Add to Policy to save in Prisma.`,
+      };
+    }
+
+    throw new Error("Extraction completed but no structured sections were found.");
   };
 
   const inferRepresentation = (messageText: string, action: any): RepresentationInference => {
@@ -1094,6 +1387,7 @@ export default function PolicyChatPopup({
           name: subtab?.name || "Generated Group",
           documentNotes: subtab?.documentNotes || "",
           displayMode: subtab?.displayMode || "document",
+          tableData: subtab?.tableData || null,
           fields: (subtab?.fields || []).map((field: any, fieldIdx: number) => makeField(field, fieldIdx)),
         })),
       }));
@@ -1123,6 +1417,9 @@ export default function PolicyChatPopup({
           }
 
           existingSubtab.documentNotes = genSubtab.documentNotes || existingSubtab.documentNotes;
+          if (genSubtab.tableData && !existingSubtab.tableData) {
+            existingSubtab.tableData = genSubtab.tableData;
+          }
           existingSubtab.fields = Array.isArray(existingSubtab.fields) ? existingSubtab.fields : [];
 
           for (const genField of genSubtab.fields || []) {

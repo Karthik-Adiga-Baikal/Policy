@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useCheckers } from "@/hooks/useCheckers";
 import PolicyDraft from "@/components/policy-builder/PolicyDraft";
 import { buildBackendAiUrl } from "@/lib/backendAiUrl";
-import { Eye, FilePlus2, FolderUp, LayoutTemplate, Paperclip, Sparkles, UploadCloud } from "lucide-react";
+import { ArrowRight, Eye, FilePlus2, FolderUp, LayoutTemplate, Paperclip, Sparkles, UploadCloud } from "lucide-react";
 import {
   PREDEFINED_POLICY_TEMPLATES,
   buildDraftPreviewFromTemplate,
@@ -611,542 +611,151 @@ export default function CreatePolicyPage() {
 
   return (
     <div className="mx-auto max-w-7xl p-8">
-      <section className="mb-6 grid gap-4 md:grid-cols-2">
-        <button
-          type="button"
-          className="rounded-2xl border border-blue-600 bg-blue-50 p-5 text-left shadow-sm ring-2 ring-blue-100 transition-all"
-        >
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <FilePlus2 className="h-4 w-4 text-blue-600" />
-            Create New Policy
-          </div>
-          <p className="text-sm text-slate-600">
-            Start from blank, template, or upload a policy document to generate draft blocks and rules for a brand-new policy.
-          </p>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard/maker/create/existing")}
-          className="rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition-all hover:border-slate-300"
-        >
-          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <FolderUp className="h-4 w-4 text-blue-600" />
-            Upload Existing Policy
-          </div>
-          <p className="text-sm text-slate-600">
-            Open the existing-policy workflow page for changes/annexure flow or direct BRE rule generation from uploaded documents.
-          </p>
-        </button>
-      </section>
-
-      {workflowTrack === "extract_only" && (
-        <Card className="mb-8">
-          <CardContent className="pt-6 space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Upload Existing Policy for Extraction</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                This path only runs extraction and Pinecone storage. It does not create a policy draft in Policy Manager.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Policy Document</Label>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,.doc,.txt,.md"
-                className="hidden"
-                onChange={(e) => setExtractOnlyFile(e.target.files?.[0] || null)}
-              />
-              <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs text-slate-600">
-                    {extractOnlyFile ? `Attached: ${extractOnlyFile.name}` : "Attach a policy file to extract and push into Pinecone"}
-                  </div>
-                  <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                    <UploadCloud className="mr-2 h-4 w-4" />
-                    {extractOnlyFile ? "Change File" : "Attach File"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <Button type="button" className="w-full" onClick={handleExtractOnly} disabled={extractOnlyLoading}>
-              {extractOnlyLoading ? "Extracting and Uploading..." : "Extract Document and Upload to Pinecone"}
-            </Button>
-
-            {extractOnlyResult && (
-              <div className="rounded-lg border bg-slate-50 p-3 text-sm text-slate-700">
-                <p><span className="font-medium">Status:</span> {extractOnlyResult?.status || "completed"}</p>
-                <p><span className="font-medium">Policy Name:</span> {extractOnlyResult?.policy_name || extractOnlyResult?.result?.policy_name || "N/A"}</p>
-                <p><span className="font-medium">Pinecone Stored:</span> {String(extractOnlyResult?.pinecone_db?.stored ?? extractOnlyResult?.result?.pinecone_db?.stored ?? "unknown")}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {workflowTrack === "build" && buildMode === "existing_changes" && (
-        <Card className="mb-8">
-          <CardContent className="pt-6 space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Existing Policy Change Workflow</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Select an existing policy, choose annexure or update flow, and optionally upload a document to extract new draft blocks/rules.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Base Policy</Label>
-              <Select value={selectedBasePolicyId} onValueChange={setSelectedBasePolicyId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select existing policy" />
-                </SelectTrigger>
-                <SelectContent>
-                  {existingPolicies.length === 0 ? (
-                    <SelectItem value="none" disabled>No policies available</SelectItem>
-                  ) : (
-                    existingPolicies.map((policy) => (
-                      <SelectItem key={policy.id} value={policy.id}>
-                        {policy.name} ({policy.version})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Change Type</Label>
-              <Select value={changeMode} onValueChange={(value: "annexure" | "update") => setChangeMode(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="annexure">Create Annexure Draft</SelectItem>
-                  <SelectItem value="update">Update Existing Draft</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Upload Supporting Policy Document (Optional)</Label>
-              <p className="text-xs text-slate-500">
-                If attached, extracted blocks and rules will be applied to the selected policy before opening build screen.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="mb-8 flex items-end justify-between gap-6">
+      {/* Hero Section + Setup Options */}
+      <div className="mb-8 grid gap-6 grid-cols-[1.4fr_0.9fr] bg-gradient-to-br from-blue-50 via-white to-indigo-50 rounded-3xl border border-slate-200 shadow-sm p-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Create New Policy</h1>
-          <p className="mt-2 max-w-3xl text-sm text-gray-600">
-            Start from a blank draft, upload an existing policy for extraction, or pick a predefined template like Word&apos;s new document gallery.
+          <div className="flex gap-2 mb-4">
+            <Badge className="bg-blue-100 text-blue-700 border-0">New Policy</Badge>
+            <Badge className="bg-emerald-100 text-emerald-700 border-0">Guided Setup</Badge>
+          </div>
+          <h2 className="text-3xl font-bold text-slate-900 mb-3">Create a New Policy</h2>
+          <p className="text-slate-600 leading-relaxed">
+            Start by importing an existing policy document, choosing a governed template, or building a fresh policy with AI assistance.
           </p>
         </div>
-        <div className="rounded-2xl border bg-white px-4 py-3 shadow-sm">
-          <div className="flex items-center gap-3 text-sm text-slate-700">
-            <LayoutTemplate className="h-5 w-5 text-blue-600" />
-            <span>{PREDEFINED_POLICY_TEMPLATES.length} predefined templates available</span>
-          </div>
-        </div>
+
+        <Card className="bg-white border-slate-200">
+          <CardContent className="p-6 space-y-4">
+            <div className="font-semibold text-slate-900 mb-4">Setup Options</div>
+            <div className="space-y-4 text-sm">
+              <div>
+                <div className="text-slate-500 font-medium mb-1">Import path</div>
+                <div className="text-slate-900">Existing document to structured policy</div>
+              </div>
+              <div className="border-t border-slate-100 pt-4">
+                <div className="text-slate-500 font-medium mb-1">Template path</div>
+                <div className="text-slate-900">Reusable policy framework to new draft</div>
+              </div>
+              <div className="border-t border-slate-100 pt-4">
+                <div className="text-slate-500 font-medium mb-1">Recommended for</div>
+                <div className="text-slate-900">Both fresh creation and policy migration</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {workflowTrack === "build" && buildMode === "new" && (
-      <section className="mb-8">
-        <div className="mb-4 flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-blue-600" />
-          <h2 className="text-lg font-semibold text-gray-900">Choose a Starting Point</h2>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <button
-            type="button"
-            onClick={() => setSelectedTemplateId("blank")}
-            className={`rounded-2xl border p-5 text-left shadow-sm transition-all ${
-              selectedTemplateId === "blank"
-                ? "border-blue-600 bg-blue-50 ring-2 ring-blue-100"
-                : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-md"
-            }`}
-          >
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div className="rounded-xl bg-slate-100 p-3 text-slate-700">
-                <FilePlus2 className="h-5 w-5" />
+      {/* Three-Column Card Grid */}
+      <div className="grid grid-cols-3 gap-6 mb-8">
+        {/* Card 1: Import Existing Policy */}
+        <Card className="bg-white border-slate-200 flex flex-col hover:shadow-md transition-shadow">
+          <CardContent className="p-6 space-y-4 flex flex-col h-full">
+            <div>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h3 className="text-lg font-bold text-slate-900">Import Existing Policy</h3>
+                <Badge className="bg-amber-100 text-amber-700 border-0 whitespace-nowrap flex-shrink-0">Migration</Badge>
               </div>
-              {selectedTemplateId === "blank" && <Badge>Selected</Badge>}
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Bring in an existing policy document and convert it into structured tabs, subtabs, and fields.
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900">Blank Policy</h3>
-            <p className="mt-2 text-sm text-slate-600">Start with an empty draft and build the full structure manually or with AI assistance later.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Badge variant="secondary">Empty Draft</Badge>
-              <Badge variant="secondary">Manual Build</Badge>
+
+            <div className="space-y-2">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                Best for migrating approved legacy policies
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                Maps source clauses into builder-ready sections
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                Useful when policy exists in Word or PDF
+              </div>
             </div>
-          </button>
 
-          {PREDEFINED_POLICY_TEMPLATES.map((template) => {
-            const stats = getPolicyTemplateStats(template);
-            const isSelected = selectedTemplateId === template.id;
+            <Button
+              className="mt-auto w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+              onClick={() => router.push("/dashboard/maker/create/existing")}
+            >
+              Import Existing Policy
+              <ArrowRight size={16} className="ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
 
-            return (
-              <div
-                key={template.id}
-                className={`rounded-2xl border bg-white p-5 shadow-sm transition-all ${
-                  isSelected
-                    ? "border-blue-600 ring-2 ring-blue-100"
-                    : "border-slate-200 hover:border-slate-300 hover:shadow-md"
-                }`}
-              >
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div className={`rounded-xl bg-linear-to-r ${template.accent} p-3 text-white shadow-sm`}>
-                    <LayoutTemplate className="h-5 w-5" />
-                  </div>
-                  {isSelected && <Badge>Selected</Badge>}
-                </div>
-
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{template.category}</div>
-                <h3 className="text-lg font-semibold text-slate-900">{template.name}</h3>
-                <p className="mt-2 min-h-10 text-sm text-slate-600">{template.summary}</p>
-
-                <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="rounded-lg bg-slate-50 px-2 py-2">
-                    <div className="font-semibold text-slate-900">{stats.tabCount}</div>
-                    <div className="text-slate-500">Tabs</div>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 px-2 py-2">
-                    <div className="font-semibold text-slate-900">{stats.subtabCount}</div>
-                    <div className="text-slate-500">Groups</div>
-                  </div>
-                  <div className="rounded-lg bg-slate-50 px-2 py-2">
-                    <div className="font-semibold text-slate-900">{stats.fieldCount}</div>
-                    <div className="text-slate-500">Fields</div>
-                  </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {template.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary">{tag}</Badge>
-                  ))}
-                </div>
-
-                <div className="mt-5 flex gap-2">
-                  <Button
-                    type="button"
-                    variant={isSelected ? "default" : "outline"}
-                    className="flex-1"
-                    onClick={() => {
-                      setSelectedTemplateId(template.id);
-                      setAttachedFile(null);
-                      setFormData((prev) => ({
-                        ...prev,
-                        product: prev.product || template.product,
-                        description: prev.description || template.description,
-                      }));
-                    }}
-                  >
-                    Use Template
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => setPreviewTemplateId(template.id)}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    Preview
-                  </Button>
-                </div>
+        {/* Card 2: Use Existing Template */}
+        <Card className="bg-white border-slate-200 flex flex-col hover:shadow-md transition-shadow">
+          <CardContent className="p-6 space-y-4 flex flex-col h-full">
+            <div>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h3 className="text-lg font-bold text-slate-900">Use Existing Template</h3>
+                <Badge className="bg-blue-100 text-blue-700 border-0 whitespace-nowrap flex-shrink-0">Recommended</Badge>
               </div>
-            );
-          })}
-        </div>
-      </section>
-      )}
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Start from a governed template and create a new policy draft on top of that structure.
+              </p>
+            </div>
 
-      <Card>
-        <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {workflowTrack === "build" && (
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.docx,.doc,.txt,.md"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] || null;
-                  setAttachedFile(file);
-                  if (buildMode === "new") {
-                    if (file) {
-                      setSelectedTemplateId("blank");
-                    }
-                    if (file && !formData.name.trim()) {
-                      setFormData((prev) => ({
-                        ...prev,
-                        name: file.name.replace(/\.[^.]+$/, ""),
-                      }));
-                    }
-                  }
-                }}
-              />
-            )}
-
-            {workflowTrack === "build" && buildMode === "new" && selectedTemplate && (
-              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                <div className="font-semibold">Selected Template: {selectedTemplate.name}</div>
-                <div className="mt-1 text-blue-800">{selectedTemplate.description}</div>
+            <div className="space-y-2">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                Best for fresh policy creation with standard controls
               </div>
-            )}
-
-            {workflowTrack === "build" && buildMode === "new" && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="name">Policy Name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder={
-                      attachedFile
-                        ? "Leave empty to use uploaded file name"
-                        : selectedTemplate
-                          ? `e.g. ${selectedTemplate.name} - North Region`
-                          : "Policy name"
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="product">Product</Label>
-                  <Input
-                    id="product"
-                    type="text"
-                    value={formData.product}
-                    onChange={(e) => setFormData({ ...formData, product: e.target.value })}
-                    placeholder={selectedTemplate ? selectedTemplate.product : "e.g., MSME, Personal Loan"}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Upload Existing Policy (Optional)</Label>
-                  <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-xs text-slate-600">
-                        {attachedFile
-                          ? `Attached: ${attachedFile.name}`
-                          : "Attach a policy file to auto-generate tabs, subtabs, and fields from extraction. Attaching a file will switch off template selection."}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {attachedFile && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setAttachedFile(null)}
-                          >
-                            Remove
-                          </Button>
-                        )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          {attachedFile ? <Paperclip className="mr-2 h-4 w-4" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                          {attachedFile ? "Change File" : "Attach File"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder={selectedTemplate?.description || "Describe the purpose of this policy"}
-                    rows={3}
-                  />
-                </div>
-              </>
-            )}
-
-            {workflowTrack === "build" && buildMode === "existing_changes" && (
-              <>
-                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                  <div className="font-semibold">Existing Policy Change Flow</div>
-                  <div className="mt-1 text-blue-800">
-                    {changeMode === "annexure"
-                      ? "A new annexure version snapshot will be created before opening the build workspace."
-                      : "Selected policy will open directly in update mode for draft changes."}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Attach Extraction File (Optional)</Label>
-                  <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-xs text-slate-600">
-                        {attachedFile
-                          ? `Attached: ${attachedFile.name}`
-                          : "Attach a file to extract new rules and append blocks to selected policy"}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {attachedFile && (
-                          <Button type="button" variant="outline" size="sm" onClick={() => setAttachedFile(null)}>
-                            Remove
-                          </Button>
-                        )}
-                        <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                          <UploadCloud className="mr-2 h-4 w-4" />
-                          {attachedFile ? "Change File" : "Attach File"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {workflowTrack === "build" && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                    <SelectTrigger id="status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="DRAFT">DRAFT</SelectItem>
-                      <SelectItem value="IN_REVIEW">IN_REVIEW</SelectItem>
-                      <SelectItem value="PUBLISHED">PUBLISHED</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {buildMode === "new" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="version">Version</Label>
-                    <Input
-                      id="version"
-                      type="text"
-                      required
-                      value={formData.version}
-                      onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                      placeholder="v1.0"
-                    />
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="checker">Assign Checker (Optional)</Label>
-                  <Select value={formData.checkerId} onValueChange={(value) => setFormData({ ...formData, checkerId: value })}>
-                    <SelectTrigger id="checker">
-                      <SelectValue placeholder="Select checker" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {!Array.isArray(checkers) || checkers.length === 0 ? (
-                        <SelectItem value="none" disabled>No checkers available</SelectItem>
-                      ) : (
-                        checkers.map((checker) => (
-                          <SelectItem key={checker.id} value={checker.id}>
-                            {checker.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <Button type="submit" className="w-full" disabled={extracting}>
-                  {extracting
-                    ? "Processing..."
-                    : buildMode === "existing_changes"
-                      ? changeMode === "annexure"
-                        ? "Create Annexure / Change Draft"
-                        : "Open Existing Policy for Changes"
-                      : attachedFile
-                        ? "Create New Policy from Uploaded File"
-                        : selectedTemplate
-                          ? `Create New Policy from ${selectedTemplate.name}`
-                          : "Create New Policy"}
-                </Button>
-              </>
-            )}
-          </form>
-        </CardContent>
-      </Card>
-
-      <Dialog open={!!previewTemplate} onOpenChange={(open) => !open && setPreviewTemplateId(null)}>
-        <DialogContent className="max-h-[90vh] w-[92vw] overflow-hidden sm:max-w-300!">
-          {previewTemplate && (
-            <>
-              <DialogHeader>
-                <DialogTitle>{previewTemplate.name}</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-                <div className="space-y-4 rounded-xl border bg-slate-50 p-4">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Category</div>
-                    <div className="mt-1 font-medium text-slate-900">{previewTemplate.category}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Product</div>
-                    <div className="mt-1 font-medium text-slate-900">{previewTemplate.product}</div>
-                  </div>
-                  <p className="text-sm text-slate-600">{previewTemplate.summary}</p>
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                    {(() => {
-                      const stats = getPolicyTemplateStats(previewTemplate);
-                      return (
-                        <>
-                          <div className="rounded-lg bg-white px-2 py-2 shadow-sm">
-                            <div className="font-semibold text-slate-900">{stats.tabCount}</div>
-                            <div className="text-slate-500">Tabs</div>
-                          </div>
-                          <div className="rounded-lg bg-white px-2 py-2 shadow-sm">
-                            <div className="font-semibold text-slate-900">{stats.subtabCount}</div>
-                            <div className="text-slate-500">Groups</div>
-                          </div>
-                          <div className="rounded-lg bg-white px-2 py-2 shadow-sm">
-                            <div className="font-semibold text-slate-900">{stats.fieldCount}</div>
-                            <div className="text-slate-500">Fields</div>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {previewTemplate.tags.map((tag) => (
-                      <Badge key={tag} variant="secondary">{tag}</Badge>
-                    ))}
-                  </div>
-                  <Button
-                    type="button"
-                    className="w-full"
-                    onClick={() => {
-                      setSelectedTemplateId(previewTemplate.id);
-                      setAttachedFile(null);
-                      setPreviewTemplateId(null);
-                      setFormData((prev) => ({
-                        ...prev,
-                        product: prev.product || previewTemplate.product,
-                        description: prev.description || previewTemplate.description,
-                      }));
-                    }}
-                  >
-                    Use This Template
-                  </Button>
-                </div>
-                <div className="max-h-[72vh] overflow-y-auto overflow-x-hidden rounded-xl border bg-white p-2">
-                  <PolicyDraft
-                    data={buildDraftPreviewFromTemplate(previewTemplate)}
-                    className="border-none shadow-none"
-                    fitContainer
-                  />
-                </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                Keeps mandatory blocks and reusable clauses intact
               </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                Lets teams create variants faster with consistency
+              </div>
+            </div>
 
+            <Button
+              className="mt-auto w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+              onClick={() => {
+                setWorkflowTrack("build");
+                setBuildMode("new");
+                setSelectedTemplateId("blank");
+              }}
+            >
+              Choose Template
+              <ArrowRight size={16} className="ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Create From Scratch */}
+        <Card className="bg-white border-slate-200 flex flex-col hover:shadow-md transition-shadow">
+          <CardContent className="p-6 space-y-4 flex flex-col h-full">
+            <div>
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h3 className="text-lg font-bold text-slate-900">Create From Scratch</h3>
+                <Badge className="bg-emerald-100 text-emerald-700 border-0 whitespace-nowrap flex-shrink-0">Blank Policy</Badge>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Start a completely blank policy or use AI to generate the initial structure and rule set.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                Best for first-time or custom governance policies
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                AI generates initial structure, controls, and workflow
+              </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+                Useful when no existing template or document fits
+              </div>
+            </div>
+
+            <Button
+              className="mt-auto w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+              onClick={() => router.push("/dashboard/maker/create/blank")}
+            >
+              Create Blank Policy
+              <ArrowRight size={16} className="ml-2" />
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
